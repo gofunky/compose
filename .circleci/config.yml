@@ -1,5 +1,5 @@
 orbs:
-  docker-orb:
+  gofunky/dockerorb:
     executors:
       default:
         docker:
