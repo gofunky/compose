@@ -1,0 +1,282 @@
+orbs:
+  docker-orb:
+    executors:
+      default:
+        docker:
+        - image: docker:18.06.0-git
+        working_directory: ~/app
+        environment:
+          IFS: ","
+    commands:
+      login:
+        parameters:
+          login:
+            description: "Login to your repository"
+            type: steps
+            default: []
+        steps:
+        - steps: << parameters.login >>
+      build:
+        parameters:
+          # Remove this once CircleCI-Public/config-preview-sdk#15 is merged
+          useArgs:
+            description: "Enable if you pass args"
+            type: boolean
+            default: false
+          args:
+            description: "Either none, one or multiple comma-separated Docker build arguments to apply"
+            type: string
+          path:
+            description: "Path to the Dockerfile"
+            type: string
+        steps:
+        - checkout
+        - setup_remote_docker
+        - restore_cache:
+            keys:
+            - docker-{{ .Branch }}
+            paths:
+            - /caches/app.tar
+        - run:
+            name: Load Docker image layer cache
+            command: |
+              set +o pipefail
+              docker load -i /caches/app.tar | true
+        - when:
+            condition: << parameters.useArgs >>
+              # Use this instead once CircleCI-Public/config-preview-sdk#15 is merged
+            # matches: ['([a-zA-Z][\w]*=[\w-\/.:]+)(,[a-zA-Z][\w]*=[\w-\/.:]+)*', "<< parameters.args >>"]
+            steps:
+            - run:
+                name: Build Docker image with arguments
+                command: |
+                  buildarg=""
+                  args="<< parameters.args >>"
+                  for arg in $args; do
+                    buildarg="${buildarg} --build-arg ${arg}"
+                  done
+                  build="docker build ${buildarg} --cache-from=app -t app << parameters.path >>"
+                  eval $build
+        - unless:
+            condition: << parameters.useArgs >>
+              # Use this instead once CircleCI-Public/config-preview-sdk#15 is merged
+            # matches: ['([a-zA-Z][\w]*=[\w-\/.:]+)(,[a-zA-Z][\w]*=[\w-\/.:]+)*', "<< parameters.args >>"]
+            steps:
+            - run:
+                name: Build Docker image without arguments
+                command: |
+                  docker build --cache-from=app -t app << parameters.path >>
+        - run:
+            name: Save Docker image layer cache
+            command: |
+              mkdir -p /caches
+              docker save -o /caches/app.tar app
+        - save_cache:
+            key: docker-{{ .Branch }}-{{ epoch }}
+            paths:
+            - /caches/app.tar
+      tag:
+        parameters:
+          tags:
+            description: "Either one or multiple comma-separated Docker tags to apply"
+            type: string
+        steps:
+        - run:
+            name: Add Docker tags
+            command: |
+              tags="<< parameters.tags >>"
+              for tag in $tags; do
+                docker tag app "$tag"
+              done
+      test:
+        parameters:
+          compose:
+            description: "Path to the docker compose test file to test"
+            type: string
+            default: "docker-compose.test.yml"
+        steps:
+        - run:
+            name: Install Docker Compose
+            command: |
+              # TODO Use layered Composer Image
+              export COMPOSER_VERSION=`curl --silent "https://api.github.com/repos/docker/compose/releases/latest" | grep -Po '"tag_name": "\K.*?(?=")'`
+              curl -L https://github.com/docker/compose/releases/download/$COMPOSER_VERSION/docker-compose-Linux-x86_64 -o /usr/local/bin/docker-compose
+              chmod +x /usr/local/bin/docker-compose
+        - run:
+            name: Run Docker compose tests
+            command: |
+              docker-compose -f "<< parameters.compose >>" up
+      push:
+        parameters:
+          tags:
+            description: "Either one or multiple comma-separated Docker tags to push"
+            type: string
+          branch:
+            description: "Only push from the given branch"
+            type: string
+        steps:
+        - deploy:
+            name: Push application Docker image
+            command: |
+              tags="<< parameters.tags >>"
+              if [ "${CIRCLE_BRANCH}" == "<< parameters.branch >>" ]; then
+                for tag in $tags; do
+                  docker push "$tag"
+                done
+              fi
+    jobs:
+      build:
+        description: "Build Docker image"
+        executor: default
+        parameters:
+          # Remove this once CircleCI-Public/config-preview-sdk#15 is merged
+          useArgs:
+            description: "Enable if you pass args"
+            type: boolean
+            default: false
+          args:
+            description: "Either none, one or multiple comma-separated Docker build arguments to apply"
+            type: string
+            default: ""
+          path:
+            description: "Path to the Dockerfile"
+            type: string
+            default: "."
+        steps:
+        - build:
+            # Remove this once CircleCI-Public/config-preview-sdk#15 is merged
+            useArgs: << parameters.useArgs >>
+            args: << parameters.args >>
+            path: << parameters.path >>
+
+      build-test:
+        description: "Build Docker image"
+        executor: default
+        parameters:
+          # Remove this once CircleCI-Public/config-preview-sdk#15 is merged
+          useArgs:
+            description: "Enable if you pass args"
+            type: boolean
+            default: false
+          args:
+            description: "Either none, one or multiple comma-separated Docker build arguments to apply"
+            type: string
+            default: ""
+          path:
+            description: "Path to the Dockerfile"
+            type: string
+            default: "."
+          tags:
+            description: "Either one or multiple comma-separated Docker tags to apply and push"
+            type: string
+          compose:
+            description: "Path to the docker compose test file to test"
+            type: string
+            default: "docker-compose.test.yml"
+        steps:
+        - build:
+            # Remove this once CircleCI-Public/config-preview-sdk#15 is merged
+            useArgs: << parameters.useArgs >>
+            args: << parameters.args >>
+            path: << parameters.path >>
+        - tag:
+            tags: << parameters.tags >>
+        - test:
+            compose: << parameters.compose >>
+
+
+      build-push:
+        description: "Build and push Docker image"
+        executor: default
+        parameters:
+          # Remove this once CircleCI-Public/config-preview-sdk#15 is merged
+          useArgs:
+            description: "Enable if you pass args"
+            type: boolean
+            default: false
+          args:
+            description: "Either none, one or multiple comma-separated Docker build arguments to apply"
+            type: string
+            default: ""
+          path:
+            description: "Path to the Dockerfile"
+            type: string
+            default: "."
+          tags:
+            description: "Either one or multiple comma-separated Docker tags to apply and push"
+            type: string
+          login:
+            description: "Login to your repository"
+            type: steps
+            default: []
+          branch:
+            description: "Only push from the given branch"
+            type: string
+            default: master
+        steps:
+        - build:
+            args: << parameters.args >>
+            path: << parameters.path >>
+        - when:
+            condition: true
+              # Use this instead once CircleCI-Public/config-preview-sdk#15 is merged
+            # matches: ['([\w-\/.:]+)?(,[\w-\/.:]+)*', "<< parameters.tags >>"]
+            steps:
+            - tag:
+                tags: << parameters.tags >>
+            - login:
+                login: << parameters.login >>
+            - push:
+                tags: << parameters.tags >>
+                branch: << parameters.branch >>
+
+      build-test-push:
+        description: "Build and push Docker image"
+        executor: default
+        parameters:
+          # Remove this once CircleCI-Public/config-preview-sdk#15 is merged
+          useArgs:
+            description: "Enable if you pass args"
+            type: boolean
+            default: false
+          args:
+            description: "Either none, one or multiple comma-separated Docker build arguments to apply"
+            type: string
+            default: ""
+          path:
+            description: "Path to the Dockerfile"
+            type: string
+            default: "."
+          tags:
+            description: "Either one or multiple comma-separated Docker tags to apply and push"
+            type: string
+          login:
+            description: "Login to your repository"
+            type: steps
+            default: []
+          branch:
+            description: "Only push from the given branch"
+            type: string
+            default: master
+          compose:
+            description: "Path to the docker compose test file to test"
+            type: string
+            default: "docker-compose.test.yml"
+        steps:
+        - build:
+            args: << parameters.args >>
+            path: << parameters.path >>
+        - when:
+            condition: true
+            # Use this instead once CircleCI-Public/config-preview-sdk#15 is merged
+            # matches: ['([\w-\/.:]+)?(,[\w-\/.:]+)*', "<< parameters.tags >>"]
+            steps:
+            - tag:
+                tags: << parameters.tags >>
+            - test:
+                compose: << parameters.compose >>
+            - login:
+                login: << parameters.login >>
+            - push:
+                tags: << parameters.tags >>
+                branch: << parameters.branch >>
