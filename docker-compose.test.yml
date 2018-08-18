@@ -1,0 +1,5 @@
+version: 3.7
+services:
+  sut:
+    image: compose
+    command: docker-compose version

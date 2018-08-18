@@ -30,6 +30,10 @@ orbs:
           path:
             description: "Path to the Dockerfile"
             type: string
+          baseTag:
+            description: "Docker base tag to apply"
+            type: string
+            default: app
         steps:
         - checkout
         - setup_remote_docker
@@ -37,15 +41,15 @@ orbs:
             keys:
             - docker-{{ .Branch }}
             paths:
-            - /caches/app.tar
+            - /caches/<< parameters.baseTag >>.tar
         - run:
             name: Load Docker image layer cache
             command: |
               set +o pipefail
-              docker load -i /caches/app.tar | true
+              docker load -i /caches/<< parameters.baseTag >>.tar | true
         - when:
             condition: << parameters.useArgs >>
-              # Use this instead once CircleCI-Public/config-preview-sdk#15 is merged
+            # Use this instead once CircleCI-Public/config-preview-sdk#15 is merged
             # matches: ['([a-zA-Z][\w]*=[\w-\/.:]+)(,[a-zA-Z][\w]*=[\w-\/.:]+)*', "<< parameters.args >>"]
             steps:
             - run:
@@ -56,38 +60,42 @@ orbs:
                   for arg in $args; do
                     buildarg="${buildarg} --build-arg ${arg}"
                   done
-                  build="docker build ${buildarg} --cache-from=app -t app << parameters.path >>"
+                  build="docker build ${buildarg} --cache-from=<< parameters.baseTag >> -t << parameters.baseTag >> << parameters.path >>"
                   eval $build
         - unless:
             condition: << parameters.useArgs >>
-              # Use this instead once CircleCI-Public/config-preview-sdk#15 is merged
+            # Use this instead once CircleCI-Public/config-preview-sdk#15 is merged
             # matches: ['([a-zA-Z][\w]*=[\w-\/.:]+)(,[a-zA-Z][\w]*=[\w-\/.:]+)*', "<< parameters.args >>"]
             steps:
             - run:
                 name: Build Docker image without arguments
                 command: |
-                  docker build --cache-from=app -t app << parameters.path >>
+                  docker build --cache-from=<< parameters.baseTag >> -t << parameters.baseTag >> << parameters.path >>
         - run:
             name: Save Docker image layer cache
             command: |
               mkdir -p /caches
-              docker save -o /caches/app.tar app
+              docker save -o /caches/<< parameters.baseTag >>.tar << parameters.baseTag >>
         - save_cache:
             key: docker-{{ .Branch }}-{{ epoch }}
             paths:
-            - /caches/app.tar
+            - /caches/<< parameters.baseTag >>.tar
       tag:
         parameters:
           tags:
             description: "Either one or multiple comma-separated Docker tags to apply"
             type: string
+          baseTag:
+            description: "Docker base tag to use"
+            type: string
+            default: app
         steps:
         - run:
             name: Add Docker tags
             command: |
               tags="<< parameters.tags >>"
               for tag in $tags; do
-                docker tag app "$tag"
+                docker tag << parameters.baseTag >> "$tag"
               done
       test:
         parameters:
@@ -99,10 +107,15 @@ orbs:
         - run:
             name: Install Docker Compose
             command: |
-              # TODO Use layered Composer Image
-              export COMPOSER_VERSION=`curl --silent "https://api.github.com/repos/docker/compose/releases/latest" | grep -Po '"tag_name": "\K.*?(?=")'`
-              curl -L https://github.com/docker/compose/releases/download/$COMPOSER_VERSION/docker-compose-Linux-x86_64 -o /usr/local/bin/docker-compose
-              chmod +x /usr/local/bin/docker-compose
+              if [ ! -e "/usr/local/bin/docker-compose" ]
+                echo "Installing latest Docker Compose..."
+                # TODO Use layered Compose Image
+                export COMPOSE_VERSION=`curl --silent "https://api.github.com/repos/docker/compose/releases/latest" | grep -Po '"tag_name": "\K.*?(?=")'`
+                curl -L https://github.com/docker/compose/releases/download/$COMPOSE_VERSION/docker-compose-Linux-x86_64 -o /usr/local/bin/docker-compose
+                chmod +x /usr/local/bin/docker-compose
+              else
+                echo "Skipping installation of Docker Compose..."
+              fi
         - run:
             name: Run Docker compose tests
             command: |
@@ -143,12 +156,17 @@ orbs:
             description: "Path to the Dockerfile"
             type: string
             default: "."
+          baseTag:
+            description: "Docker base tag to use"
+            type: string
+            default: app
         steps:
         - build:
             # Remove this once CircleCI-Public/config-preview-sdk#15 is merged
             useArgs: << parameters.useArgs >>
             args: << parameters.args >>
             path: << parameters.path >>
+            baseTag: << parameters.baseTag >>
 
       build-test:
         description: "Build Docker image"
@@ -174,12 +192,17 @@ orbs:
             description: "Path to the docker compose test file to test"
             type: string
             default: "docker-compose.test.yml"
+          baseTag:
+            description: "Docker base tag to use"
+            type: string
+            default: app
         steps:
         - build:
             # Remove this once CircleCI-Public/config-preview-sdk#15 is merged
             useArgs: << parameters.useArgs >>
             args: << parameters.args >>
             path: << parameters.path >>
+            baseTag: << parameters.baseTag >>
         - tag:
             tags: << parameters.tags >>
         - test:
@@ -214,13 +237,20 @@ orbs:
             description: "Only push from the given branch"
             type: string
             default: master
+          baseTag:
+            description: "Docker base tag to use"
+            type: string
+            default: app
         steps:
         - build:
+            # Remove this once CircleCI-Public/config-preview-sdk#15 is merged
+            useArgs: << parameters.useArgs >>
             args: << parameters.args >>
             path: << parameters.path >>
+            baseTag: << parameters.baseTag >>
         - when:
             condition: true
-              # Use this instead once CircleCI-Public/config-preview-sdk#15 is merged
+            # Use this instead once CircleCI-Public/config-preview-sdk#15 is merged
             # matches: ['([\w-\/.:]+)?(,[\w-\/.:]+)*', "<< parameters.tags >>"]
             steps:
             - tag:
@@ -263,10 +293,17 @@ orbs:
             description: "Path to the docker compose test file to test"
             type: string
             default: "docker-compose.test.yml"
+          baseTag:
+            description: "Docker base tag to use"
+            type: string
+            default: app
         steps:
         - build:
+            # Remove this once CircleCI-Public/config-preview-sdk#15 is merged
+            useArgs: << parameters.useArgs >>
             args: << parameters.args >>
             path: << parameters.path >>
+            baseTag: << parameters.baseTag >>
         - when:
             condition: true
             # Use this instead once CircleCI-Public/config-preview-sdk#15 is merged
@@ -281,3 +318,25 @@ orbs:
             - push:
                 tags: << parameters.tags >>
                 branch: << parameters.branch >>
+workflows:
+  build:
+    jobs:
+    - docker/build-test-push:
+        context: docker-hub
+        # Remove this once CircleCI-Public/config-preview-sdk#15 is merged
+        useArgs: true
+        # Latest version
+        args: "COMPOSE_VERSION=`curl --silent 'https://api.github.com/repos/docker/compose/releases/latest' | grep -Po '\"tag_name\": \"\K.*?(?=\")'`"
+        baseTag: "compose"
+        tags: "gofunky/compose:latest"
+        login:
+          - docker login -u $DOCKER_USR -p $DOCKER_PWD
+    - docker/build-test-push:
+        context: docker-hub
+        # Remove this once CircleCI-Public/config-preview-sdk#15 is merged
+        useArgs: true
+        args: "COMPOSE_VERSION=1.21.2"
+        baseTag: "compose"
+        tags: "gofunky/compose:1.21.2,gofunky/compose:1.21"
+        login:
+        - docker login -u $DOCKER_USR -p $DOCKER_PWD
