@@ -1,4 +1,3 @@
-version: 2
 orbs:
   gofunky/dockerorb:
     executors:
@@ -318,6 +317,8 @@ orbs:
             - push:
                 tags: << parameters.tags >>
                 branch: << parameters.branch >>
+
+version: 2.1
 workflows:
   version: 2
   build:
