@@ -204,6 +204,7 @@ orbs:
             baseTag: << parameters.baseTag >>
         - tag:
             tags: << parameters.tags >>
+            baseTag: << parameters.baseTag >>
         - test:
             compose: << parameters.compose >>
 
@@ -254,6 +255,7 @@ orbs:
             steps:
             - tag:
                 tags: << parameters.tags >>
+                baseTag: << parameters.baseTag >>
             - login:
                 login: << parameters.login >>
             - push:
@@ -310,6 +312,7 @@ orbs:
             steps:
             - tag:
                 tags: << parameters.tags >>
+                baseTag: << parameters.baseTag >>
             - test:
                 compose: << parameters.compose >>
             - login:
