@@ -331,20 +331,19 @@ version: 2.1
 workflows:
   build:
     jobs:
-    - dockerorb/build-test-push:
-        executor: dockerorb/compose
-        context: docker-hub
-        # Remove this once CircleCI-Public/config-preview-sdk#15 is merged
-        useArgs: true
-        # Latest version
-        args: "COMPOSE_VERSION=`curl --silent 'https://api.github.com/repos/docker/compose/releases/latest' | grep -o '\"tag_name\": \"\\K.*?(?=\")'`,BUILD_DATE=`date -u +\"%Y-%m-%dT%H:%M:%SZ\"`,VCS_REF=`git rev-parse --short HEAD`"
-        baseTag: "compose"
-        tags: "gofunky/compose:latest"
-        login:
-        - run:
-            name: Login to Docker Hub
-            command: |
-              docker login -u $DOCKER_USR -p $DOCKER_PWD
+    #    - dockerorb/build-test-push:
+    #        context: docker-hub
+    #        # Remove this once CircleCI-Public/config-preview-sdk#15 is merged
+    #        useArgs: true
+    #        # Latest version
+    #        args: "COMPOSE_VERSION=`curl --silent 'https://api.github.com/repos/docker/compose/releases/latest' | grep -o '\"tag_name\": \"\\K.*?(?=\")'`,BUILD_DATE=`date -u +\"%Y-%m-%dT%H:%M:%SZ\"`,VCS_REF=`git rev-parse --short HEAD`"
+    #        baseTag: "compose"
+    #        tags: "gofunky/compose:latest"
+    #        login:
+    #        - run:
+    #            name: Login to Docker Hub
+    #            command: |
+    #              docker login -u $DOCKER_USR -p $DOCKER_PWD
     - dockerorb/build-test-push:
         context: docker-hub
         # Remove this once CircleCI-Public/config-preview-sdk#15 is merged
