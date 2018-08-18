@@ -3,7 +3,7 @@ orbs:
     executors:
       default:
         docker:
-        - image: docker:18.06.0-git
+        - image: docker:18.06.1-git
         working_directory: ~/app
         environment:
           IFS: ","
@@ -108,8 +108,8 @@ orbs:
             command: |
               if [ ! -e "/usr/local/bin/docker-compose" ]; then
                 echo "Installing latest Docker Compose..."
-                apk add --no-cache --update curl
-                export COMPOSE_VERSION=`curl --silent "https://api.github.com/repos/docker/compose/releases/latest" | grep -Po '"tag_name": "\\K.*?(?=")'`
+                apk add --no-cache curl
+                export COMPOSE_VERSION=`curl --silent "https://api.github.com/repos/docker/compose/releases/latest" | grep --text -Po '"tag_name": "\\K.*?(?=")'`
                 curl -L https://github.com/docker/compose/releases/download/$COMPOSE_VERSION/docker-compose-Linux-x86_64 -o /usr/local/bin/docker-compose
                 chmod +x /usr/local/bin/docker-compose
               else
@@ -323,7 +323,6 @@ orbs:
 
 version: 2.1
 workflows:
-  version: 2
   build:
     jobs:
     - dockerorb/build-test-push:
@@ -331,7 +330,7 @@ workflows:
         # Remove this once CircleCI-Public/config-preview-sdk#15 is merged
         useArgs: true
         # Latest version
-        args: "COMPOSE_VERSION=`curl --silent 'https://api.github.com/repos/docker/compose/releases/latest' | grep -Po '\"tag_name\": \"\\K.*?(?=\")'`,BUILD_DATE=`date -u +\"%Y-%m-%dT%H:%M:%SZ\"`,VCS_REF=`git rev-parse --short HEAD`"
+        args: "COMPOSE_VERSION=`curl --silent 'https://api.github.com/repos/docker/compose/releases/latest' | grep --text -Po '\"tag_name\": \"\\K.*?(?=\")'`,BUILD_DATE=`date -u +\"%Y-%m-%dT%H:%M:%SZ\"`,VCS_REF=`git rev-parse --short HEAD`"
         baseTag: "compose"
         tags: "gofunky/compose:latest"
         login:
@@ -343,7 +342,7 @@ workflows:
         context: docker-hub
         # Remove this once CircleCI-Public/config-preview-sdk#15 is merged
         useArgs: true
-        args: "COMPOSE_VERSION=1.21.2,BUILD_DATE=`date -u +\"%Y-%m-%dT%H:%M:%SZ\"`,VCS_REF=`git rev-parse --short HEAD`"
+        args: "DOCKER_VERSION=18.06.1,COMPOSE_VERSION=1.21.2,BUILD_DATE=`date -u +\"%Y-%m-%dT%H:%M:%SZ\"`,VCS_REF=`git rev-parse --short HEAD`"
         baseTag: "compose"
         tags: "gofunky/compose:1.21.2,gofunky/compose:1.21"
         login:
