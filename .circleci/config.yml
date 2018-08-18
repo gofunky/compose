@@ -110,7 +110,7 @@ orbs:
               if [ ! -e "/usr/local/bin/docker-compose" ]
                 echo "Installing latest Docker Compose..."
                 # TODO Use layered Compose Image
-                export COMPOSE_VERSION=`curl --silent "https://api.github.com/repos/docker/compose/releases/latest" | grep -Po '"tag_name": "\K.*?(?=")'`
+                export COMPOSE_VERSION=`curl --silent "https://api.github.com/repos/docker/compose/releases/latest" | grep -Po '"tag_name": "\\K.*?(?=")'`
                 curl -L https://github.com/docker/compose/releases/download/$COMPOSE_VERSION/docker-compose-Linux-x86_64 -o /usr/local/bin/docker-compose
                 chmod +x /usr/local/bin/docker-compose
               else
@@ -326,7 +326,7 @@ workflows:
         # Remove this once CircleCI-Public/config-preview-sdk#15 is merged
         useArgs: true
         # Latest version
-        args: "COMPOSE_VERSION=`curl --silent 'https://api.github.com/repos/docker/compose/releases/latest' | grep -Po '\"tag_name\": \"\K.*?(?=\")'`,BUILD_DATE=`date -u +\"%Y-%m-%dT%H:%M:%SZ\"`,VCS_REF=`git rev-parse --short HEAD`"
+        args: "COMPOSE_VERSION=`curl --silent 'https://api.github.com/repos/docker/compose/releases/latest' | grep -Po '\"tag_name\": \"\\K.*?(?=\")'`,BUILD_DATE=`date -u +\"%Y-%m-%dT%H:%M:%SZ\"`,VCS_REF=`git rev-parse --short HEAD`"
         baseTag: "compose"
         tags: "gofunky/compose:latest"
         login:
