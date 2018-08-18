@@ -3,7 +3,7 @@ orbs:
     executors:
       default:
         docker:
-        - image: docker:18.06.1-git
+        - image: docker:18.06.0-git
         working_directory: ~/app
         environment:
           IFS: ","
@@ -342,7 +342,7 @@ workflows:
         context: docker-hub
         # Remove this once CircleCI-Public/config-preview-sdk#15 is merged
         useArgs: true
-        args: "DOCKER_VERSION=18.06.1,COMPOSE_VERSION=1.21.2,BUILD_DATE=`date -u +\"%Y-%m-%dT%H:%M:%SZ\"`,VCS_REF=`git rev-parse --short HEAD`"
+        args: "DOCKER_VERSION=18.06.0,COMPOSE_VERSION=1.21.2,BUILD_DATE=`date -u +\"%Y-%m-%dT%H:%M:%SZ\"`,VCS_REF=`git rev-parse --short HEAD`"
         baseTag: "compose"
         tags: "gofunky/compose:1.21.2,gofunky/compose:1.21"
         login:
