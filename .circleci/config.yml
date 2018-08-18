@@ -332,7 +332,10 @@ workflows:
         baseTag: "compose"
         tags: "gofunky/compose:latest"
         login:
-          - docker login -u $DOCKER_USR -p $DOCKER_PWD
+        - run:
+            name: Login to Docker Hub
+            command: |
+              docker login -u $DOCKER_USR -p $DOCKER_PWD
     - dockerorb/build-test-push:
         context: docker-hub
         # Remove this once CircleCI-Public/config-preview-sdk#15 is merged
@@ -341,4 +344,7 @@ workflows:
         baseTag: "compose"
         tags: "gofunky/compose:1.21.2,gofunky/compose:1.21"
         login:
-        - docker login -u $DOCKER_USR -p $DOCKER_PWD
+        - run:
+            name: Login to Docker Hub
+            command: |
+              docker login -u $DOCKER_USR -p $DOCKER_PWD
