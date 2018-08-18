@@ -1,5 +1,5 @@
 orbs:
-  gofunky/dockerorb:
+  dockerorb:
     executors:
       default:
         docker:
@@ -323,7 +323,7 @@ workflows:
   version: 2
   build:
     jobs:
-    - docker/build-test-push:
+    - dockerorb/build-test-push:
         context: docker-hub
         # Remove this once CircleCI-Public/config-preview-sdk#15 is merged
         useArgs: true
@@ -333,7 +333,7 @@ workflows:
         tags: "gofunky/compose:latest"
         login:
           - docker login -u $DOCKER_USR -p $DOCKER_PWD
-    - docker/build-test-push:
+    - dockerorb/build-test-push:
         context: docker-hub
         # Remove this once CircleCI-Public/config-preview-sdk#15 is merged
         useArgs: true
