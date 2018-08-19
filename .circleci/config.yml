@@ -119,16 +119,6 @@ orbs:
               else
                 echo "Skipping installation of Docker Compose..."
               fi
-              if [ ! -e "/usr/local/bin/docker-compose" ]; then
-                echo "Installing latest Docker Compose..."
-                wget -O /usr/local/bin/docker-compose https://github.com/docker/compose/releases/download/1.21.2/docker-compose-Linux-x86_64
-                chmod +x /usr/local/bin/docker-compose
-              else
-                echo "Skipping installation of Docker Compose..."
-              fi
-        - run:
-            name: Run Docker compose tests
-            command: |
               /usr/local/bin/docker-compose -f "~/app/<< parameters.compose >>" up
       push:
         parameters:
