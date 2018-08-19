@@ -115,16 +115,14 @@ orbs:
               if [ ! -e "/usr/local/bin/docker-compose" ]; then
                 echo "Installing latest Docker Compose..."
                 apk add --no-cache curl
-                curl -L https://github.com/docker/compose/releases/download/1.21.2/docker-compose-Linux-x86_64 -o /usr/local/bin/
-                mv /usr/local/bin/docker-compose-Linux-x86_64 /usr/local/bin/docker-compose
+                curl -L https://github.com/docker/compose/releases/download/1.21.2/docker-compose-Linux-x86_64 -o /usr/local/bin/docker-compose
                 chmod +x /usr/local/bin/docker-compose
               else
                 echo "Skipping installation of Docker Compose..."
               fi
         - run:
             name: Run Docker compose tests
-            command: |
-              docker-compose -f "<< parameters.compose >>" up
+            command: docker-compose -f "<< parameters.compose >>" up
       push:
         parameters:
           tags:
