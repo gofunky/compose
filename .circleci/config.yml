@@ -116,8 +116,6 @@ orbs:
                 echo "Installing latest Docker Compose..."
                 wget -O ~/app/docker-compose https://github.com/docker/compose/releases/download/1.21.2/docker-compose-Linux-x86_64
                 chmod +x ~/app/docker-compose
-                echo $PATH
-                which docker-compose
               else
                 echo "Skipping installation of Docker Compose..."
               fi
