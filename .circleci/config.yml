@@ -116,10 +116,15 @@ orbs:
                 echo "Installing latest Docker Compose..."
                 wget -O /usr/local/bin/docker-compose https://github.com/docker/compose/releases/download/1.21.2/docker-compose-Linux-x86_64
                 chmod +x /usr/local/bin/docker-compose
+                echo $PATH
+                which docker-compose
               else
                 echo "Skipping installation of Docker Compose..."
               fi
-              /usr/local/bin/docker-compose -f "~/app/<< parameters.compose >>" up
+        - run:
+            name: Run Docker compose tests
+            command: |
+              docker-compose -f "<< parameters.compose >>" up
       push:
         parameters:
           tags:
@@ -343,7 +348,7 @@ workflows:
         context: docker-hub
         # Remove this once CircleCI-Public/config-preview-sdk#15 is merged
         useArgs: true
-        args: "DOCKER_VERSION=18.06.0,COMPOSE_VERSION=1.21.2,BUILD_DATE=`date -u +\"%Y-%m-%dT%H:%M:%SZ\"`,VCS_REF=`git rev-parse --short HEAD`"
+        args: "DOCKER_VERSION=18.06.0,COMPOSE_VERSION=1.21.2,VERSION=1.21.2,BUILD_DATE=`date -u +\"%Y-%m-%dT%H:%M:%SZ\"`,VCS_REF=`git rev-parse --short HEAD`"
         baseTag: "compose"
         tags: "gofunky/compose:1.21.2,gofunky/compose:1.21"
         login:
