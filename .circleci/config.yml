@@ -122,7 +122,7 @@ orbs:
               fi
         - run:
             name: Run Docker compose tests
-            command: docker-compose -f "<< parameters.compose >>" up
+            command: /usr/local/bin/docker-compose -f ~/app/<< parameters.compose >> up
       push:
         parameters:
           tags:
