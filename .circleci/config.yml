@@ -114,7 +114,7 @@ orbs:
             command: |
               if [ ! -e "/usr/local/bin/docker-compose" ]; then
                 echo "Installing latest Docker Compose..."
-                apk add --no-cache py-pip=9.0.0-r1
+                apk add --no-cache py-pip=py2-pip-10.0.1-r0
                 pip install docker-compose==1.21.2
               else
                 echo "Skipping installation of Docker Compose..."
