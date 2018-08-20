@@ -1,15 +1,13 @@
 ARG DOCKER_VERSION=stable
 FROM python:3.7.0-alpine3.8 as build
 
-WORKDIR /code
-
 ARG COMPOSE_VERSION=master
 
 RUN apk --no-cache add git && \
     pip3 install --upgrade pip setuptools tox
 
 # until docker/compose#6141 is merged
-RUN git clone --branch musl https://github.com/andyneff/compose.git /compose
+RUN git clone --branch musl https://github.com/andyneff/compose.git /code/compose
 
 WORKDIR /code/compose
 
