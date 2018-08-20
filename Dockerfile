@@ -5,7 +5,7 @@ ARG COMPOSE_VERSION
 
 RUN apk --no-cache add python3 && \
     python3 -m ensurepip && \
-    pip3 install --upgrade pip setuptoolsh
+    pip3 install --upgrade pip setuptools
 
 # until docker/compose#6141 is merged
 RUN git clone --branch musl https://github.com/andyneff/compose.git /compose
