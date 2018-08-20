@@ -1,10 +1,9 @@
 ARG DOCKER_VERSION=stable
-FROM docker:${DOCKER_VERSION}-git as build
+FROM python:3.7.0-alpine3.8 as build
 
-ARG COMPOSE_VERSION
+ARG COMPOSE_VERSION=master
 
-RUN apk --no-cache add python3 && \
-    python3 -m ensurepip && \
+RUN apk --no-cache add git && \
     pip3 install --upgrade pip setuptools
 
 # until docker/compose#6141 is merged
