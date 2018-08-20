@@ -1,16 +1,19 @@
 ARG DOCKER_VERSION=stable
 FROM python:3.7.0-alpine3.8 as build
 
+WORKDIR /code
+
 ARG COMPOSE_VERSION=master
 
 RUN apk --no-cache add git && \
-    pip3 install --upgrade pip setuptools
+    pip3 install --upgrade pip setuptools tox
 
 # until docker/compose#6141 is merged
 RUN git clone --branch musl https://github.com/andyneff/compose.git /compose
-RUN cd /compose && \
-    pip --no-cache-dir install -r requirements.txt -r requirements-dev.txt pyinstaller && \
-    git rev-parse --short HEAD > compose/GITSHA && \
+
+WORKDIR /code/compose
+
+RUN tox --notest && \
     ln -s /lib /lib64 && ln -s /lib/libc.musl-x86_64.so.1 ldd && ln -s /lib/ld-musl-x86_64.so.1 /lib64/ld-linux-x86-64.so.2 && \
     pyinstaller docker-compose.spec && \
     mv dist/docker-compose-musl-Linux-x86_64 /usr/local/bin/docker-compose
