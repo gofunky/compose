@@ -8,9 +8,9 @@ RUN ln -s /lib /lib64 && ln -s /lib/libc.musl-x86_64.so.1 ldd && ln -s /lib/ld-m
 RUN pip install tox
 
 # until docker/compose#6141 is merged
-RUN git clone --branch musl https://github.com/andyneff/compose.git /code/compose
+RUN git clone --branch musl https://github.com/andyneff/compose.git /code
 
-WORKDIR /code/compose
+WORKDIR /code
 
 RUN tox -e py36 --notest && \
     mv /code/.tox/py36/bin/docker-compose /usr/local/bin/docker-compose && \
