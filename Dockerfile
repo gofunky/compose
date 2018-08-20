@@ -3,7 +3,7 @@ FROM python:3.6.6-alpine3.8 as build
 
 ARG COMPOSE_VERSION=master
 
-RUN apk --no-cache add git binutils
+RUN apk --no-cache add git python3-dev binutils
 RUN ln -s /lib /lib64 && ln -s /lib/libc.musl-x86_64.so.1 ldd && ln -s /lib/ld-musl-x86_64.so.1 /lib64/ld-linux-x86-64.so.2
 RUN pip install tox
 
