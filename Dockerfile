@@ -1,17 +1,17 @@
 ARG DOCKER_VERSION=stable
-FROM python:3.6.6-alpine3.8 as build
+FROM python:3.5-alpine3.8 as build
 
 ARG COMPOSE_VERSION=master
 
 RUN apk --no-cache add git python3-dev binutils
-RUN ln -s /lib /lib64 && ln -s /lib/libc.musl-x86_64.so.1 ldd && ln -s /lib/ld-musl-x86_64.so.1 /lib64/ld-linux-x86-64.so.2
-RUN pip install tox
 
 # until docker/compose#6141 is merged
-RUN git clone --branch musl https://github.com/andyneff/compose.git /code
+RUN git clone --branch musl https://github.com/andyneff/compose.git /app
 
-WORKDIR /code
+WORKDIR /app
 
+RUN adduser -h /home/user -s /bin/sh -D user
+ COPY --chown=user:user requirements-build.txt /code/
 RUN apk add --no-cache --virtual .deps ca-certificates gcc zlib-dev musl-dev libc-dev pwgen; \
     curl -fsSL https://bootstrap.pypa.io/get-pip.py -o /tmp/get-pip.py; \
     python3 /tmp/get-pip.py; \
@@ -22,15 +22,22 @@ RUN apk add --no-cache --virtual .deps ca-certificates gcc zlib-dev musl-dev lib
     python3 ./waf configure --no-lsb all; \
     cd ..; \
     python3 setup.py bdist_wheel; \
-    mv dist/*.whl /code; \
+    mv dist/*.whl /; \
     cd /; \
     rm -rf /tmp/*; \
     apk del --no-cache .deps
-
-RUN tox -e py36 --notest && \
-    /code/.tox/py36/bin/pip install /code/*.whl && \
-    mv /code/.tox/py36/bin/docker-compose /usr/local/bin/docker-compose && \
-    chmod +x /usr/local/bin/docker-compose
+WORKDIR /code/
+RUN chown user:user /code
+RUN pip install tox==2.1.1
+COPY --chown=user:user requirements.txt /code/
+COPY --chown=user:user requirements-dev.txt /code/
+COPY --chown=user:user .pre-commit-config.yaml /code/
+COPY --chown=user:user setup.py /code/
+COPY --chown=user:user tox.ini /code/
+COPY --chown=user:user compose /code/compose/
+RUN su -c "tox -e py35 --notest" user; \
+    /code/.tox/py35/bin/pip install /*.whl
+COPY --chown=user:user . /code/
 
 FROM docker:${DOCKER_VERSION}-git
 MAINTAINER matfax <mat@fax.fyi>
