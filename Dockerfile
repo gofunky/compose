@@ -23,6 +23,8 @@ RUN apk add --no-cache curl
 
 COPY --from=build /usr/local/bin/docker-compose /usr/local/bin/docker-compose
 
+RUN docker-compose --version
+
 ARG BUILD_DATE
 ARG VCS_REF
 ARG VERSION=latest
