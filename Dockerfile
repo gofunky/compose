@@ -3,15 +3,17 @@ FROM docker:${DOCKER_VERSION}-git as build
 
 ARG COMPOSE_VERSION
 
-RUN apk --no-cache add python py-pip
-RUN git clone --branch ${COMPOSE_VERSION} https://github.com/docker/compose.git /compose
-RUN cd /compose &&\
-    pip --no-cache-dir install -r requirements.txt -r requirements-dev.txt pyinstaller==3.1.1 &&\
-    git rev-parse --short HEAD > compose/GITSHA &&\
-    ln -s /lib /lib64 && ln -s /lib/libc.musl-x86_64.so.1 ldd && ln -s /lib/ld-musl-x86_64.so.1 /lib64/ld-linux-x86-64.so.2 && \
-    pyinstaller docker-compose.spec &&\
-    unlink /lib/ld-linux-x86-64.so.2 /lib64 ldd ||true &&\
-    mv dist/docker-compose /usr/local/bin/docker-compose
+RUN apk --no-cache add python3 && \
+    python3 -m ensurepip && \
+    pip3 install --upgrade pip setuptoolsh
+
+# until docker/compose#6141 is merged
+RUN git clone --branch musl https://github.com/andyneff/compose.git /compose
+RUN cd /compose && \
+    pip --no-cache-dir install -r requirements.txt -r requirements-dev.txt pyinstaller && \
+    git rev-parse --short HEAD > compose/GITSHA && \
+    pyinstaller docker-compose.spec && \
+    mv dist/docker-compose-musl-Linux-x86_64 /usr/local/bin/docker-compose
 
 FROM docker:${DOCKER_VERSION}-git
 MAINTAINER matfax <mat@fax.fyi>
