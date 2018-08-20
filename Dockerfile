@@ -12,6 +12,7 @@ RUN git clone --branch musl https://github.com/andyneff/compose.git /compose
 RUN cd /compose && \
     pip --no-cache-dir install -r requirements.txt -r requirements-dev.txt pyinstaller && \
     git rev-parse --short HEAD > compose/GITSHA && \
+    ln -s /lib /lib64 && ln -s /lib/libc.musl-x86_64.so.1 ldd && ln -s /lib/ld-musl-x86_64.so.1 /lib64/ld-linux-x86-64.so.2 && \
     pyinstaller docker-compose.spec && \
     mv dist/docker-compose-musl-Linux-x86_64 /usr/local/bin/docker-compose
 
