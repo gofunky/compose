@@ -11,7 +11,7 @@ RUN git clone --branch musl https://github.com/andyneff/compose.git /app
 WORKDIR /app
 
 RUN adduser -h /home/user -s /bin/sh -D user
- COPY --chown=user:user requirements-build.txt /code/
+COPY --chown=user:user requirements-build.txt /code/
 RUN apk add --no-cache --virtual .deps ca-certificates gcc zlib-dev musl-dev libc-dev pwgen; \
     curl -fsSL https://bootstrap.pypa.io/get-pip.py -o /tmp/get-pip.py; \
     python3 /tmp/get-pip.py; \
