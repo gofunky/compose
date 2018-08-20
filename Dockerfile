@@ -12,7 +12,8 @@ RUN git clone --branch musl https://github.com/andyneff/compose.git /code
 
 WORKDIR /code
 
-RUN tox -e py36 --notest && \
+RUN python3 setup.py bdist_wheel && \
+    tox -e py36 --notest && \
     mv /code/.tox/py36/bin/docker-compose /usr/local/bin/docker-compose && \
     chmod +x /usr/local/bin/docker-compose
 
@@ -23,7 +24,7 @@ RUN apk add --no-cache curl
 
 COPY --from=build /usr/local/bin/docker-compose /usr/local/bin/docker-compose
 
-RUN docker-compose --version
+ENV MUSL=1
 
 ARG BUILD_DATE
 ARG VCS_REF
