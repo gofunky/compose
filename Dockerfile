@@ -12,8 +12,23 @@ RUN git clone --branch musl https://github.com/andyneff/compose.git /code
 
 WORKDIR /code
 
-RUN python3 setup.py bdist_wheel && \
-    tox -e py36 --notest && \
+RUN apk add --no-cache --virtual .deps ca-certificates gcc zlib-dev musl-dev libc-dev pwgen; \
+    curl -fsSL https://bootstrap.pypa.io/get-pip.py -o /tmp/get-pip.py; \
+    python3 /tmp/get-pip.py; \
+    cd /tmp; \
+    pip download -r /code/requirements-build.txt; \
+    tar xzf PyInstaller*.tar.gz; \
+    cd PyInstaller-*/bootloader; \
+    python3 ./waf configure --no-lsb all; \
+    cd ..; \
+    python3 setup.py bdist_wheel; \
+    mv dist/*.whl /code; \
+    cd /; \
+    rm -rf /tmp/*; \
+    apk del --no-cache .deps
+
+RUN tox -e py36 --notest && \
+    /code/.tox/py36/bin/pip install /code/*.whl && \
     mv /code/.tox/py36/bin/docker-compose /usr/local/bin/docker-compose && \
     chmod +x /usr/local/bin/docker-compose
 
