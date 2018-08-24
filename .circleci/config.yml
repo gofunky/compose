@@ -108,7 +108,7 @@ orbs:
               REPO="/go/src/$URL/"
               mkdir -pv $REPO
               mv -v ./* $REPO
-              cd $REPO
+              ln -s $REPO
         - when:
             condition: << parameters.attach >>
             steps:
