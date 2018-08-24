@@ -327,6 +327,7 @@ orbs:
         executor: default
         parameters:
           <<: *go_prepare_params
+          <<: *go_test_params
         steps:
         - prepare:
             <<: *go_prepare_args
