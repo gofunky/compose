@@ -124,12 +124,18 @@ orbs:
                   key: dep-
               - run:
                   name: Update dependencies
-                  command: dep ensure
+                  command: |
+                    if [ -e "Gopkg.toml" ]; then
+                      echo "Fetching vendor folder"
+                      dep ensure -vendor-only
+                    else
+                      echo "Initializing dependencies"
+                      dep init
+                    fi
               - save_cache:
                   key: dep-{{ checksum "Gopkg.toml" }}-{{ checksum "Gopkg.lock" }}
                   paths:
                   - vendor
-                  - Gopkg.lock
         - unless:
             condition: << parameters.dep >>
             steps:
