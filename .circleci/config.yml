@@ -244,69 +244,69 @@ orbs:
             building: << parameters.building >>
       test:
         description: "Test Golang Packages"
-          executor: default
-          parameters:
-            <<: *go_prepare_params
-            <<: *go_test_results
-            <<: *go_build_params
-          steps:
-          - prepare:
-              <<: *go_prepare_args
-              <<: *go_test_args
-          - test:
-              <<: *go_test_args
+        executor: default
+        parameters:
+          <<: *go_prepare_params
+          <<: *go_test_results
+          <<: *go_build_params
+        steps:
+        - prepare:
+            <<: *go_prepare_args
+            <<: *go_test_args
+        - test:
+            <<: *go_test_args
       race_test:
         description: "Race Test Golang Packages"
-          executor: default
-          parameters:
-            <<: *go_prepare_params
-            <<: *go_test_results
-            <<: *go_build_params
-          steps:
-          - prepare:
-              <<: *go_prepare_args
-              <<: *go_test_args
-          - race_test:
-              <<: *go_test_args
+        executor: default
+        parameters:
+          <<: *go_prepare_params
+          <<: *go_test_results
+          <<: *go_build_params
+        steps:
+        - prepare:
+            <<: *go_prepare_args
+            <<: *go_test_args
+        - race_test:
+            <<: *go_test_args
       i386_test:
         description: "Race Test Golang Packages"
-          executor: default
-          parameters:
-            <<: *go_prepare_params
-            <<: *go_test_results
-            <<: *go_build_params
-          steps:
-          - prepare:
-              <<: *go_prepare_args
-              <<: *go_test_args
-          - i386_test:
-              <<: *go_test_args
+        executor: default
+        parameters:
+          <<: *go_prepare_params
+          <<: *go_test_results
+          <<: *go_build_params
+        steps:
+        - prepare:
+            <<: *go_prepare_args
+            <<: *go_test_args
+        - i386_test:
+            <<: *go_test_args
       codacy_test:
         description: "Codacy Coverage Test"
-          executor: default
-          parameters:
-            <<: *go_prepare_params
-            <<: *go_test_results
-            <<: *go_build_params
-          steps:
-          - prepare:
-              <<: *go_prepare_args
-              <<: *go_test_args
-          - codacy_test:
-              <<: *go_test_args
+        executor: default
+        parameters:
+          <<: *go_prepare_params
+          <<: *go_test_results
+          <<: *go_build_params
+        steps:
+        - prepare:
+            <<: *go_prepare_args
+            <<: *go_test_args
+        - codacy_test:
+            <<: *go_test_args
       codecov_test:
         description: "Codecov Coverage Test"
-          executor: default
-          parameters:
-            <<: *go_prepare_params
-            <<: *go_test_results
-            <<: *go_build_params
-          steps:
-          - prepare:
-              <<: *go_prepare_args
-              <<: *go_test_args
-          - codecov_test:
-              <<: *go_test_args
+        executor: default
+        parameters:
+          <<: *go_prepare_params
+          <<: *go_test_results
+          <<: *go_build_params
+        steps:
+        - prepare:
+            <<: *go_prepare_args
+            <<: *go_test_args
+        - codecov_test:
+            <<: *go_test_args
 
   dockerorb:
     executors:
