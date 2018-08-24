@@ -1,4 +1,313 @@
+go_test_results: &go_test_results
+  results:
+    description: "Path to test results"
+    type: string
+    default: "/tmp/test-results"
+
+go_prepare_params: &go_prepare_params
+  dep:
+    description: "To use dep for dependency fetching"
+    type: boolean
+    default: true
+  attach:
+    description: "Attach workspace"
+    type: boolean
+    default: false
+  attachAt:
+    description: "Where to attach the workspace"
+    type: string
+    default: "."
+
+go_build_params: &go_build_params
+  building:
+    description: "Building steps"
+    type: steps
+    default:
+    - run:
+        name: Build
+        command: go build -v ./...
+
+go_test_args: &go_test_args
+  results: << parameters.results >>
+
+go_prepare_args: &go_prepare_args
+  dep: << parameters.dep >>
+  attach: << parameters.attach >>
+  attachAt: << parameters.attachAt >>
+
+docker_arg_params: &docker_arg_params
+  # Remove this once CircleCI-Public/config-preview-sdk#15 is merged
+  useArgs:
+    description: "Enable if you pass args"
+    type: boolean
+    default: false
+  args:
+    description: "Either none, one or multiple comma-separated Docker build arguments to apply"
+    type: string
+    default: ""
+
+docker_attach_params: &docker_attach_params
+  attach:
+    description: "Attach workspace"
+    type: boolean
+    default: false
+  attachAt:
+    description: "Where to attach the workspace"
+    type: string
+    default: "."
+
+docker_build_params: &docker_build_params
+  path:
+    description: "Path to the Dockerfile"
+    type: string
+    default: "."
+  addLabels:
+    description: "Add default schema labels"
+    type: boolean
+    default: false
+  baseTag:
+    description: "Docker base tag to use"
+    type: string
+    default: app
+
+docker_tags_params: &docker_tags_params
+  tags:
+    description: "Either one or multiple comma-separated Docker tags to apply and push"
+    type: string
+
+docker_build_args: &docker_build_args
+  # Remove this once CircleCI-Public/config-preview-sdk#15 is merged
+  useArgs: << parameters.useArgs >>
+  args: << parameters.args >>
+  path: << parameters.path >>
+  baseTag: << parameters.baseTag >>
+  attach: << parameters.attach >>
+  attachAt: << parameters.attachAt >>
+  addLabels: << parameters.addLabels >>
+
 orbs:
+  goorb:
+    executors:
+      default:
+        docker:
+        - image: gofunky/golang:1.10
+        working_directory: /app
+    commands:
+      prepare:
+        parameters:
+          <<: *go_prepare_params
+          <<: *go_test_results
+        steps:
+        - checkout
+        - run:
+            name: Init Golang Source
+            command: |
+              URL=`git remote get-url origin`
+              URL=${URL#"https://"}
+              URL=${URL%".git"}
+              REPO="/go/$URL/"
+              mkdir -pv $REPO
+              mv -v ./* $REPO
+              cd $REPO
+        - when:
+            condition: << parameters.attach >>
+            steps:
+            - attach_workspace:
+                at: << parameters.attachAt >>
+        - restore_cache:
+            keys:
+            - go-{{ .Branch }}-{ checksum "/usr/local/go/bin/go" }
+        - when:
+            condition: << parameters.dep >>
+            steps:
+              - restore_cache:
+                  key: dep-
+              - run:
+                  name: Update dependencies
+                  command: dep ensure
+              - save_cache:
+                  key: dep-{{ checksum "Gopkg.toml" }}-{{ checksum "Gopkg.lock" }}
+                  paths:
+                  - vendor
+                  - Gopkg.lock
+        - unless:
+            condition: << parameters.dep >>
+            steps:
+              - run:
+                  name: Get Dependencies
+                  command: go get ./...
+      test:
+        parameters:
+          <<: *go_test_results
+        steps:
+        - run:
+            name: Run Tests
+            command: |
+              trap "go-junit-report <<< parameters.results >>/go-test-report.out > << parameters.results >>/go-test-report.xml" EXIT
+              go test -v ./... | tee << parameters.results >>/go-test-report.out
+        - store_artifacts:
+            path: << parameters.results >>
+            destination: raw-test-output
+        - store_test_results:
+            path: << parameters.results >>
+      race_test:
+        parameters:
+          <<: *go_test_results
+        steps:
+        - run:
+            name: Run Race Tests
+            command: |
+              trap "go-junit-report <<< parameters.results >>/go-race-test-report.out > << parameters.results >>/go-race-test-report.xml" EXIT
+              go test -v ./... -short -race | tee << parameters.results >>/go-race-test-report.out
+        - store_artifacts:
+            path: << parameters.results >>
+            destination: raw-test-output
+        - store_test_results:
+            path: << parameters.results >>
+      i386_test:
+        parameters:
+          <<: *go_test_results
+        steps:
+        - run:
+            name: Run i386 Tests
+            command: |
+              trap "go-junit-report <<< parameters.results >>/go-386-test-report.out > << parameters.results >>/go-i386-test-report.xml" EXIT
+              env GOOS=linux GOARCH=386 go test -v ./... | tee << parameters.results >>/go-i386-test-report.out
+        - store_artifacts:
+            path: << parameters.results >>
+            destination: raw-test-output
+        - store_test_results:
+            path: << parameters.results >>
+      codacy_test:
+        parameters:
+          <<: *go_test_results
+        steps:
+        - run:
+            name: Check Codacy Context
+            command: |
+              if [ -z "$CODACY_TOKEN" ]; then
+                echo "ERROR: CODACY_TOKEN is not set!"
+                exit 127
+              fi
+        - run:
+            name: Run Coverage Tests
+            command: |
+              goverage -v -coverprofile=<< parameters.results >>/coverage.out ./...
+        - run:
+            name: Push Coverage Results
+            command: godacov -t $CODACY_TOKEN -r << parameters.results >>/coverage.out -c $CIRCLE_SHA1 || true
+        - store_artifacts:
+            path: /tmp/test-results
+            destination: raw-test-output
+      codecov_test:
+        parameters:
+          <<: *go_test_results
+        steps:
+        - run:
+            name: Run Coverage Tests
+            command: goverage -v -coverprofile=<< parameters.results >>/coverage.txt -covermode=atomic ./...
+        - run:
+            name: Push Coverage Results
+            command: bash <(curl -s https://codecov.io/bash)
+        - store_artifacts:
+            path: /tmp/test-results
+            destination: raw-test-output
+      build:
+        parameters:
+          <<: *go_build_params
+        steps:
+        - steps: << parameters.building >>
+        - save_cache:
+            key: go-{{ .Branch }}-{ checksum "/usr/local/go/bin/go" }-{{ epoch }}
+            paths:
+            - /go/pkg
+        - persist_to_workspace:
+            root: /go
+            paths:
+            - src/
+            - pkg/
+            - bin/
+            - repo.env
+    jobs:
+      build:
+        description: "Build Golang App"
+        executor: default
+        parameters:
+          <<: *go_prepare_params
+          <<: *go_test_results
+          <<: *go_build_params
+        steps:
+        - prepare:
+            <<: *go_prepare_args
+            <<: *go_test_args
+        - build:
+            building: << parameters.building >>
+      test:
+        description: "Test Golang Packages"
+          executor: default
+          parameters:
+            <<: *go_prepare_params
+            <<: *go_test_results
+            <<: *go_build_params
+          steps:
+          - prepare:
+              <<: *go_prepare_args
+              <<: *go_test_args
+          - test:
+              <<: *go_test_args
+      race_test:
+        description: "Race Test Golang Packages"
+          executor: default
+          parameters:
+            <<: *go_prepare_params
+            <<: *go_test_results
+            <<: *go_build_params
+          steps:
+          - prepare:
+              <<: *go_prepare_args
+              <<: *go_test_args
+          - race_test:
+              <<: *go_test_args
+      i386_test:
+        description: "Race Test Golang Packages"
+          executor: default
+          parameters:
+            <<: *go_prepare_params
+            <<: *go_test_results
+            <<: *go_build_params
+          steps:
+          - prepare:
+              <<: *go_prepare_args
+              <<: *go_test_args
+          - i386_test:
+              <<: *go_test_args
+      codacy_test:
+        description: "Codacy Coverage Test"
+          executor: default
+          parameters:
+            <<: *go_prepare_params
+            <<: *go_test_results
+            <<: *go_build_params
+          steps:
+          - prepare:
+              <<: *go_prepare_args
+              <<: *go_test_args
+          - codacy_test:
+              <<: *go_test_args
+      codecov_test:
+        description: "Codecov Coverage Test"
+          executor: default
+          parameters:
+            <<: *go_prepare_params
+            <<: *go_test_results
+            <<: *go_build_params
+          steps:
+          - prepare:
+              <<: *go_prepare_args
+              <<: *go_test_args
+          - codecov_test:
+              <<: *go_test_args
+
   dockerorb:
     executors:
       default:
@@ -24,24 +333,17 @@ orbs:
         - steps: << parameters.login >>
       build:
         parameters:
-          # Remove this once CircleCI-Public/config-preview-sdk#15 is merged
-          useArgs:
-            description: "Enable if you pass args"
-            type: boolean
-            default: false
-          args:
-            description: "Either none, one or multiple comma-separated Docker build arguments to apply"
-            type: string
-          path:
-            description: "Path to the Dockerfile"
-            type: string
-          baseTag:
-            description: "Docker base tag to apply"
-            type: string
-            default: app
+          <<: *docker_arg_params
+          <<: *docker_attach_params
+          <<: *docker_build_params
         steps:
         - checkout
         - setup_remote_docker
+        - when:
+            condition: << parameters.attach >>
+            steps:
+            - attach_workspace:
+                at: << parameters.attachAt >>
         - restore_cache:
             keys:
             - docker-{{ .Branch }}
@@ -57,25 +359,51 @@ orbs:
             # Use this instead once CircleCI-Public/config-preview-sdk#15 is merged
             # matches: ['([a-zA-Z][\w]*=[\w-\/.:]+)(,[a-zA-Z][\w]*=[\w-\/.:]+)*', "<< parameters.args >>"]
             steps:
-            - run:
-                name: Build Docker image with arguments
-                command: |
-                  buildarg=""
-                  args="<< parameters.args >>"
-                  for arg in $args; do
-                    buildarg="${buildarg} --build-arg ${arg}"
-                  done
-                  build="docker build ${buildarg} --cache-from=<< parameters.baseTag >> -t << parameters.baseTag >> << parameters.path >>"
-                  eval $build
+            - when:
+                condition: << parameters.addLabels >>
+                steps:
+                - run:
+                    name: Build Docker image with arguments and labels
+                    command: |
+                      buildarg=""
+                      args="<< parameters.args >>,BUILD_DATE=`date -u +\"%Y-%m-%dT%H:%M:%SZ\"`,VCS_REF=`git rev-parse --short HEAD`"
+                      for arg in $args; do
+                        buildarg="${buildarg} --build-arg ${arg}"
+                      done
+                      build="docker build ${buildarg} --cache-from=<< parameters.baseTag >> -t << parameters.baseTag >> << parameters.path >>"
+                      eval $build
+            - unless:
+                condition: << parameters.addLabels >>
+                steps:
+                - run:
+                    name: Build Docker image with arguments and without labels
+                    command: |
+                      buildarg=""
+                      args="<< parameters.args >>"
+                      for arg in $args; do
+                        buildarg="${buildarg} --build-arg ${arg}"
+                      done
+                      build="docker build ${buildarg} --cache-from=<< parameters.baseTag >> -t << parameters.baseTag >> << parameters.path >>"
+                      eval $build
         - unless:
             condition: << parameters.useArgs >>
             # Use this instead once CircleCI-Public/config-preview-sdk#15 is merged
             # matches: ['([a-zA-Z][\w]*=[\w-\/.:]+)(,[a-zA-Z][\w]*=[\w-\/.:]+)*', "<< parameters.args >>"]
             steps:
-            - run:
-                name: Build Docker image without arguments
-                command: |
-                  docker build --cache-from=<< parameters.baseTag >> -t << parameters.baseTag >> << parameters.path >>
+            - when:
+                condition: << parameters.addLabels >>
+                steps:
+                - run:
+                    name: Build Docker image without arguments and with labels
+                    command: |
+                      docker build --build-arg BUILD_DATE=`date -u +\"%Y-%m-%dT%H:%M:%SZ\"` --build-arg VCS_REF=`git rev-parse --short HEAD` --cache-from=<< parameters.baseTag >> -t << parameters.baseTag >> << parameters.path >>
+            - unless:
+                condition: << parameters.addLabels >>
+                steps:
+                - run:
+                    name: Build Docker image without arguments and without labels
+                    command: |
+                      docker build --cache-from=<< parameters.baseTag >> -t << parameters.baseTag >> << parameters.path >>
         - run:
             name: Save Docker image layer cache
             command: |
@@ -87,9 +415,7 @@ orbs:
             - /caches/<< parameters.baseTag >>.tar
       tag:
         parameters:
-          tags:
-            description: "Either one or multiple comma-separated Docker tags to apply"
-            type: string
+          <<: *docker_tags_params
           baseTag:
             description: "Docker base tag to use"
             type: string
@@ -125,9 +451,7 @@ orbs:
               docker-compose -f "<< parameters.compose >>" up --exit-code-from sut
       push:
         parameters:
-          tags:
-            description: "Either one or multiple comma-separated Docker tags to push"
-            type: string
+          <<: *docker_tags_params
           branch:
             description: "Only push from the given branch"
             type: string
@@ -146,66 +470,28 @@ orbs:
         description: "Build Docker image"
         executor: default
         parameters:
-          # Remove this once CircleCI-Public/config-preview-sdk#15 is merged
-          useArgs:
-            description: "Enable if you pass args"
-            type: boolean
-            default: false
-          args:
-            description: "Either none, one or multiple comma-separated Docker build arguments to apply"
-            type: string
-            default: ""
-          path:
-            description: "Path to the Dockerfile"
-            type: string
-            default: "."
-          baseTag:
-            description: "Docker base tag to use"
-            type: string
-            default: app
+          <<: *docker_arg_params
+          <<: *docker_attach_params
+          <<: *docker_build_params
         steps:
         - build:
-            # Remove this once CircleCI-Public/config-preview-sdk#15 is merged
-            useArgs: << parameters.useArgs >>
-            args: << parameters.args >>
-            path: << parameters.path >>
-            baseTag: << parameters.baseTag >>
+            <<: *docker_build_args
 
       build-test:
         description: "Build Docker image"
         executor: default
         parameters:
-          # Remove this once CircleCI-Public/config-preview-sdk#15 is merged
-          useArgs:
-            description: "Enable if you pass args"
-            type: boolean
-            default: false
-          args:
-            description: "Either none, one or multiple comma-separated Docker build arguments to apply"
-            type: string
-            default: ""
-          path:
-            description: "Path to the Dockerfile"
-            type: string
-            default: "."
-          tags:
-            description: "Either one or multiple comma-separated Docker tags to apply and push"
-            type: string
+          <<: *docker_arg_params
+          <<: *docker_attach_params
+          <<: *docker_build_params
+          <<: *docker_tags_params
           compose:
             description: "Path to the docker compose test file to test"
             type: string
             default: "docker-compose.test.yml"
-          baseTag:
-            description: "Docker base tag to use"
-            type: string
-            default: app
         steps:
         - build:
-            # Remove this once CircleCI-Public/config-preview-sdk#15 is merged
-            useArgs: << parameters.useArgs >>
-            args: << parameters.args >>
-            path: << parameters.path >>
-            baseTag: << parameters.baseTag >>
+            <<: *docker_build_args
         - tag:
             tags: << parameters.tags >>
             baseTag: << parameters.baseTag >>
@@ -217,22 +503,10 @@ orbs:
         description: "Build and push Docker image"
         executor: default
         parameters:
-          # Remove this once CircleCI-Public/config-preview-sdk#15 is merged
-          useArgs:
-            description: "Enable if you pass args"
-            type: boolean
-            default: false
-          args:
-            description: "Either none, one or multiple comma-separated Docker build arguments to apply"
-            type: string
-            default: ""
-          path:
-            description: "Path to the Dockerfile"
-            type: string
-            default: "."
-          tags:
-            description: "Either one or multiple comma-separated Docker tags to apply and push"
-            type: string
+          <<: *docker_arg_params
+          <<: *docker_attach_params
+          <<: *docker_build_params
+          <<: *docker_tags_params
           login:
             description: "Login to your repository"
             type: steps
@@ -241,17 +515,9 @@ orbs:
             description: "Only push from the given branch"
             type: string
             default: master
-          baseTag:
-            description: "Docker base tag to use"
-            type: string
-            default: app
         steps:
         - build:
-            # Remove this once CircleCI-Public/config-preview-sdk#15 is merged
-            useArgs: << parameters.useArgs >>
-            args: << parameters.args >>
-            path: << parameters.path >>
-            baseTag: << parameters.baseTag >>
+            <<: *docker_build_args
         - when:
             condition: true
             # Use this instead once CircleCI-Public/config-preview-sdk#15 is merged
@@ -270,22 +536,10 @@ orbs:
         description: "Build and push Docker image"
         executor: default
         parameters:
-          # Remove this once CircleCI-Public/config-preview-sdk#15 is merged
-          useArgs:
-            description: "Enable if you pass args"
-            type: boolean
-            default: false
-          args:
-            description: "Either none, one or multiple comma-separated Docker build arguments to apply"
-            type: string
-            default: ""
-          path:
-            description: "Path to the Dockerfile"
-            type: string
-            default: "."
-          tags:
-            description: "Either one or multiple comma-separated Docker tags to apply and push"
-            type: string
+          <<: *docker_arg_params
+          <<: *docker_attach_params
+          <<: *docker_build_params
+          <<: *docker_tags_params
           login:
             description: "Login to your repository"
             type: steps
@@ -298,17 +552,9 @@ orbs:
             description: "Path to the docker compose test file to test"
             type: string
             default: "docker-compose.test.yml"
-          baseTag:
-            description: "Docker base tag to use"
-            type: string
-            default: app
         steps:
         - build:
-            # Remove this once CircleCI-Public/config-preview-sdk#15 is merged
-            useArgs: << parameters.useArgs >>
-            args: << parameters.args >>
-            path: << parameters.path >>
-            baseTag: << parameters.baseTag >>
+            <<: *docker_build_args
         - when:
             condition: true
             # Use this instead once CircleCI-Public/config-preview-sdk#15 is merged
@@ -329,6 +575,10 @@ version: 2.1
 workflows:
   build:
     jobs:
+    - goorb/test
+    - goorb/build:
+        requires:
+        - goorb/test
     #    - dockerorb/build-test-push:
     #        context: docker-hub
     #        # Remove this once CircleCI-Public/config-preview-sdk#15 is merged
