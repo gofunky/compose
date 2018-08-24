@@ -126,7 +126,7 @@ orbs:
               - run:
                   name: Update dependencies
                   command: |
-                    ./goto.sh
+                    source goto.sh
                     if [ -e "Gopkg.toml" ]; then
                       echo "Fetching vendor folder"
                       dep ensure -vendor-only
@@ -144,7 +144,7 @@ orbs:
               - run:
                   name: Get Dependencies
                   command: |
-                    ./goto.sh
+                    source goto.sh
                     go get ./...
       test:
         parameters:
