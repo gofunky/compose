@@ -91,7 +91,7 @@ orbs:
       default:
         docker:
         - image: gofunky/golang:1.10
-        working_directory: /app
+        working_directory: ~/app
     commands:
       prepare:
         parameters:
