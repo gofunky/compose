@@ -129,10 +129,10 @@ orbs:
                     source goto.sh
                     if [ -e "Gopkg.toml" ]; then
                       echo "Fetching vendor folder"
-                      dep ensure -vendor-only
+                      dep ensure -v -vendor-only
                     else
                       echo "Initializing dependencies"
-                      dep init
+                      dep init -v
                     fi
               - save_cache:
                   key: dep-{{ checksum "Gopkg.toml" }}-{{ checksum "Gopkg.lock" }}
