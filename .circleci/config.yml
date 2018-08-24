@@ -1,8 +1,11 @@
-go_test_results: &go_test_results
+go_test_params: &go_test_params
   results:
     description: "Path to test results"
     type: string
     default: "/tmp/test-results"
+
+go_test_args: &go_test_args
+  results: << parameters.results >>
 
 go_prepare_params: &go_prepare_params
   dep:
@@ -18,6 +21,11 @@ go_prepare_params: &go_prepare_params
     type: string
     default: "."
 
+go_prepare_args: &go_prepare_args
+  dep: << parameters.dep >>
+  attach: << parameters.attach >>
+  attachAt: << parameters.attachAt >>
+
 go_build_params: &go_build_params
   building:
     description: "Building steps"
@@ -27,13 +35,21 @@ go_build_params: &go_build_params
         name: Build
         command: go build -v ./...
 
-go_test_args: &go_test_args
-  results: << parameters.results >>
+go_build: &go_build
+  parameters:
+    <<: *go_prepare_params
+    <<: *go_build_params
+  steps:
+  - prepare:
+      <<: *go_prepare_args
+  - build:
+      building: << parameters.building >>
 
-go_prepare_args: &go_prepare_args
-  dep: << parameters.dep >>
-  attach: << parameters.attach >>
-  attachAt: << parameters.attachAt >>
+go_fossa_params: &go_fossa_params
+  upload:
+    description: "To upload the results to the fossa service"
+    type: boolean
+    default: false
 
 docker_arg_params: &docker_arg_params
   # Remove this once CircleCI-Public/config-preview-sdk#15 is merged
@@ -57,8 +73,20 @@ docker_attach_params: &docker_attach_params
     default: "."
 
 docker_build_params: &docker_build_params
-  path:
+  file:
     description: "Path to the Dockerfile"
+    type: string
+    default: "Dockerfile"
+  cache:
+    description: "Use image layer cache"
+    type: boolean
+    default: false
+  prepare:
+    description: "Prepare steps after checkout (e.g., chmod)"
+    type: steps
+    default: []
+  path:
+    description: "Build path"
     type: string
     default: "."
   addLabels:
@@ -79,6 +107,9 @@ docker_build_args: &docker_build_args
   # Remove this once CircleCI-Public/config-preview-sdk#15 is merged
   useArgs: << parameters.useArgs >>
   args: << parameters.args >>
+  file: << parameters.file >>
+  cache: << parameters.cache >>
+  prepare: << parameters.prepare >>
   path: << parameters.path >>
   baseTag: << parameters.baseTag >>
   attach: << parameters.attach >>
@@ -90,13 +121,20 @@ orbs:
     executors:
       default:
         docker:
-        - image: gofunky/golang:1.10
+        - image: gofunky/golang:1.10.3
+        working_directory: ~/app
+      alpine:
+        docker:
+        - image: gofunky/golang:1.10.3-alpine3.8
+        working_directory: ~/app
+      circleci:
+        docker:
+        - image: gofunky/golang:1.10.3-circleci
         working_directory: ~/app
     commands:
       prepare:
         parameters:
           <<: *go_prepare_params
-          <<: *go_test_results
         steps:
         - checkout
         - run:
@@ -148,49 +186,52 @@ orbs:
                     go get ./...
       test:
         parameters:
-          <<: *go_test_results
+          <<: *go_test_params
         steps:
         - run:
             name: Run Tests
             command: |
+              source goto.sh
               trap "go-junit-report <<< parameters.results >>/go-test-report.out > << parameters.results >>/go-test-report.xml" EXIT
               go test -v ./... | tee << parameters.results >>/go-test-report.out
         - store_artifacts:
             path: << parameters.results >>
-            destination: raw-test-output
+            destination: test
         - store_test_results:
             path: << parameters.results >>
       race_test:
         parameters:
-          <<: *go_test_results
+          <<: *go_test_params
         steps:
         - run:
             name: Run Race Tests
             command: |
+              source goto.sh
               trap "go-junit-report <<< parameters.results >>/go-race-test-report.out > << parameters.results >>/go-race-test-report.xml" EXIT
               go test -v ./... -short -race | tee << parameters.results >>/go-race-test-report.out
         - store_artifacts:
             path: << parameters.results >>
-            destination: raw-test-output
+            destination: race-test
         - store_test_results:
             path: << parameters.results >>
       i386_test:
         parameters:
-          <<: *go_test_results
+          <<: *go_test_params
         steps:
         - run:
             name: Run i386 Tests
             command: |
+              source goto.sh
               trap "go-junit-report <<< parameters.results >>/go-386-test-report.out > << parameters.results >>/go-i386-test-report.xml" EXIT
               env GOOS=linux GOARCH=386 go test -v ./... | tee << parameters.results >>/go-i386-test-report.out
         - store_artifacts:
             path: << parameters.results >>
-            destination: raw-test-output
+            destination: i386-test
         - store_test_results:
             path: << parameters.results >>
       codacy_test:
         parameters:
-          <<: *go_test_results
+          <<: *go_test_params
         steps:
         - run:
             name: Check Codacy Context
@@ -202,26 +243,60 @@ orbs:
         - run:
             name: Run Coverage Tests
             command: |
+              source goto.sh
               goverage -v -coverprofile=<< parameters.results >>/coverage.out ./...
         - run:
             name: Push Coverage Results
-            command: godacov -t $CODACY_TOKEN -r << parameters.results >>/coverage.out -c $CIRCLE_SHA1 || true
+            command: |
+              source goto.sh
+              godacov -t $CODACY_TOKEN -r << parameters.results >>/coverage.out -c $CIRCLE_SHA1 || true
         - store_artifacts:
-            path: /tmp/test-results
-            destination: raw-test-output
+            path: << parameters.results >>
+            destination: codacy
       codecov_test:
         parameters:
-          <<: *go_test_results
+          <<: *go_test_params
         steps:
         - run:
             name: Run Coverage Tests
-            command: goverage -v -coverprofile=<< parameters.results >>/coverage.txt -covermode=atomic ./...
+            command: |
+              source goto.sh
+              goverage -v -coverprofile=<< parameters.results >>/coverage.txt -covermode=atomic ./...
         - run:
             name: Push Coverage Results
-            command: bash <(curl -s https://codecov.io/bash)
+            command: |
+              source goto.sh
+              wget -O - https://codecov.io/bash | bash
         - store_artifacts:
-            path: /tmp/test-results
-            destination: raw-test-output
+            path: << parameters.results >>
+            destination: codecov
+      fossa_test:
+        parameters:
+          <<: *go_test_params
+          <<: *go_fossa_params
+        steps:
+        - run:
+            name: Check Fossa Context
+            command: |
+              if [ -z "$FOSSA_API_KEY" ]; then
+                echo "ERROR: FOSSA_API_KEY is not set!"
+                exit 127
+              fi
+        - run:
+            name: Run Coverage Tests
+            command: |
+              source goto.sh
+              fossa init
+              mv .fossa.yml << parameters.results >>/fossa.yml
+        - when:
+            condition: << parameters.upload >>
+            steps:
+            - run:
+                name: Upload to Fossa
+                command: fossa test
+        - store_artifacts:
+            path: << parameters.results >>
+            destination: fossa
       build:
         parameters:
           <<: *go_build_params
@@ -242,27 +317,19 @@ orbs:
       build:
         description: "Build Golang App"
         executor: default
-        parameters:
-          <<: *go_prepare_params
-          <<: *go_test_results
-          <<: *go_build_params
-        steps:
-        - prepare:
-            <<: *go_prepare_args
-            <<: *go_test_args
-        - build:
-            building: << parameters.building >>
+        <<: *go_build
+      build-alpine:
+        description: "Build Golang App in Alpine"
+        executor: alpine
+        <<: *go_build
       test:
         description: "Test Golang Packages"
         executor: default
         parameters:
           <<: *go_prepare_params
-          <<: *go_test_results
-          <<: *go_build_params
         steps:
         - prepare:
             <<: *go_prepare_args
-            <<: *go_test_args
         - test:
             <<: *go_test_args
       race_test:
@@ -270,12 +337,10 @@ orbs:
         executor: default
         parameters:
           <<: *go_prepare_params
-          <<: *go_test_results
-          <<: *go_build_params
+          <<: *go_test_params
         steps:
         - prepare:
             <<: *go_prepare_args
-            <<: *go_test_args
         - race_test:
             <<: *go_test_args
       i386_test:
@@ -283,12 +348,10 @@ orbs:
         executor: default
         parameters:
           <<: *go_prepare_params
-          <<: *go_test_results
-          <<: *go_build_params
+          <<: *go_test_params
         steps:
         - prepare:
             <<: *go_prepare_args
-            <<: *go_test_args
         - i386_test:
             <<: *go_test_args
       codacy_test:
@@ -296,27 +359,36 @@ orbs:
         executor: default
         parameters:
           <<: *go_prepare_params
-          <<: *go_test_results
-          <<: *go_build_params
+          <<: *go_test_params
         steps:
         - prepare:
             <<: *go_prepare_args
-            <<: *go_test_args
         - codacy_test:
             <<: *go_test_args
       codecov_test:
         description: "Codecov Coverage Test"
-        executor: default
+        executor: circleci
         parameters:
           <<: *go_prepare_params
-          <<: *go_test_results
-          <<: *go_build_params
+          <<: *go_test_params
         steps:
         - prepare:
             <<: *go_prepare_args
-            <<: *go_test_args
         - codecov_test:
             <<: *go_test_args
+      fossa_test:
+        description: "Fossa License Test"
+        executor: circleci
+        parameters:
+          <<: *go_prepare_params
+          <<: *go_test_params
+          <<: *go_fossa_params
+        steps:
+        - prepare:
+            <<: *go_prepare_args
+        - fossa_test:
+            <<: *go_test_args
+            upload: << parameters.upload >>
 
   dockerorb:
     executors:
@@ -354,16 +426,20 @@ orbs:
             steps:
             - attach_workspace:
                 at: << parameters.attachAt >>
-        - restore_cache:
-            keys:
-            - docker-{{ .Branch }}
-            paths:
-            - /caches/<< parameters.baseTag >>.tar
-        - run:
-            name: Load Docker image layer cache
-            command: |
-              set +o pipefail
-              docker load -i /caches/<< parameters.baseTag >>.tar | true
+        - steps: << parameters.prepare >>
+        - when:
+            condition: << parameters.cache >>
+            steps:
+            - restore_cache:
+                keys:
+                - docker-<< parameters.path >>-<< parameters.file >>-<< parameters.baseTag >>-{{ .Branch }}
+                paths:
+                - /caches/<< parameters.baseTag >>.tar
+            - run:
+                name: Load Docker image layer cache
+                command: |
+                  set +o pipefail
+                  docker load -i /caches/<< parameters.baseTag >>.tar | true
         - when:
             condition: << parameters.useArgs >>
             # Use this instead once CircleCI-Public/config-preview-sdk#15 is merged
@@ -380,7 +456,7 @@ orbs:
                       for arg in $args; do
                         buildarg="${buildarg} --build-arg ${arg}"
                       done
-                      build="docker build ${buildarg} --cache-from=<< parameters.baseTag >> -t << parameters.baseTag >> << parameters.path >>"
+                      build="docker build ${buildarg} --cache-from=<< parameters.baseTag >> -f << parameters.file >> -t << parameters.baseTag >> << parameters.path >>"
                       eval $build
             - unless:
                 condition: << parameters.addLabels >>
@@ -393,7 +469,7 @@ orbs:
                       for arg in $args; do
                         buildarg="${buildarg} --build-arg ${arg}"
                       done
-                      build="docker build ${buildarg} --cache-from=<< parameters.baseTag >> -t << parameters.baseTag >> << parameters.path >>"
+                      build="docker build ${buildarg} --cache-from=<< parameters.baseTag >> -f << parameters.file >> -t << parameters.baseTag >> << parameters.path >>"
                       eval $build
         - unless:
             condition: << parameters.useArgs >>
@@ -406,23 +482,26 @@ orbs:
                 - run:
                     name: Build Docker image without arguments and with labels
                     command: |
-                      docker build --build-arg BUILD_DATE=`date -u +\"%Y-%m-%dT%H:%M:%SZ\"` --build-arg VCS_REF=`git rev-parse --short HEAD` --cache-from=<< parameters.baseTag >> -t << parameters.baseTag >> << parameters.path >>
+                      docker build --build-arg BUILD_DATE=`date -u +\"%Y-%m-%dT%H:%M:%SZ\"` --build-arg VCS_REF=`git rev-parse --short HEAD` --cache-from=<< parameters.baseTag >> -f << parameters.file >> -t << parameters.baseTag >> << parameters.path >>
             - unless:
                 condition: << parameters.addLabels >>
                 steps:
                 - run:
                     name: Build Docker image without arguments and without labels
                     command: |
-                      docker build --cache-from=<< parameters.baseTag >> -t << parameters.baseTag >> << parameters.path >>
-        - run:
-            name: Save Docker image layer cache
-            command: |
-              mkdir -p /caches
-              docker save -o /caches/<< parameters.baseTag >>.tar << parameters.baseTag >>
-        - save_cache:
-            key: docker-{{ .Branch }}-{{ epoch }}
-            paths:
-            - /caches/<< parameters.baseTag >>.tar
+                      docker build --cache-from=<< parameters.baseTag >> -f << parameters.file >> -t << parameters.baseTag >> << parameters.path >>
+        - when:
+            condition: << parameters.cache >>
+            steps:
+            - run:
+                name: Save Docker image layer cache
+                command: |
+                  mkdir -p /caches
+                  docker save -o /caches/<< parameters.baseTag >>.tar << parameters.baseTag >>
+            - save_cache:
+                key: docker-<< parameters.path >>-<< parameters.file >>-<< parameters.baseTag >>-{{ .Branch }}-{{ epoch }}
+                paths:
+                - /caches/<< parameters.baseTag >>.tar
       tag:
         parameters:
           <<: *docker_tags_params
@@ -458,7 +537,7 @@ orbs:
         - run:
             name: Run Docker compose tests
             command: |
-              docker-compose -f "<< parameters.compose >>" up --exit-code-from sut
+              docker-compose -f "<< parameters.compose >>" up --exit-code-from sut --build
       push:
         parameters:
           <<: *docker_tags_params
@@ -586,7 +665,7 @@ workflows:
   build:
     jobs:
     - goorb/test
-    - goorb/build:
+    - goorb/build-alpine:
         requires:
         - goorb/test
     #    - dockerorb/build-test-push:
