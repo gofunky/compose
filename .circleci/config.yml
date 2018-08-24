@@ -103,9 +103,9 @@ orbs:
             name: Init Golang Source
             command: |
               URL=`git remote get-url origin`
-              URL=${URL#"https://"}
-              URL=${URL%".git"}
-              REPO="/go/$URL/"
+              URL=`echo "$URL" | sed -e "s/^https:\/\///" -e "s/\.git//" | sed -e "s/^git@//"`
+              URL=`echo "$URL" | sed -r 's/github.com:/github.com\//g'`
+              REPO="/go/src/$URL/"
               mkdir -pv $REPO
               mv -v ./* $REPO
               cd $REPO
