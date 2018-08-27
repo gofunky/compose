@@ -91,7 +91,7 @@ go_custom_build_params: &go_custom_build_params
     type: boolean
     default: false
   nodebug:
-    descirption: "Enable ldflags that disable debugging"
+    description: "Enable ldflags that disable debugging"
     type: boolean
     default: false
   output:
