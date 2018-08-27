@@ -1048,8 +1048,8 @@ workflows:
         tags: "gofunky/compose:`cd libcompose && git describe --abbrev=0 --tags`,gofunky/compose:`cd libcompose && git describe --abbrev=0 --tags`-docker18.06.0,gofunky/compose:stable"
         login: docker login -u $DOCKER_USR -p $DOCKER_PWD
         requires:
-        - build-libcompose
-        - test-libcompose
+        - build_libcompose
+        - test_libcompose
         <<: *golang_master_filter
     #    - dockerorb/build_test_push:
     #        context: docker-hub
