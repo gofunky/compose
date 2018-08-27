@@ -1023,7 +1023,7 @@ workflows:
     - goorb/musl:
         name: build-libcompose
         go_version: 1.10.3
-        alpine_version: 3.8
+        alpine_version: "3.8"
         upx: true
         output: /go/bin/docker-compose
         input: ./libcompose/cli/main
