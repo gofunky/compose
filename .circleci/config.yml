@@ -38,7 +38,7 @@ go_test_args: &go_test_args
 
 go_prepare_params: &go_prepare_params
   dep:
-    description: "To use dep for dependency fetching"
+    description: "To use 'dep' for dependency importing"
     type: boolean
     default: true
   attach:
@@ -49,6 +49,10 @@ go_prepare_params: &go_prepare_params
     description: "Where to attach the workspace"
     type: string
     default: "."
+  import:
+    description: "To use 'go get' for importing dependencies"
+    type: boolean
+    default: false
   import_path:
     description: "Base path for package import"
     type: string
@@ -62,6 +66,7 @@ go_prepare_args: &go_prepare_args
   dep: << parameters.dep >>
   attach: << parameters.attach >>
   attach_at: << parameters.attach_at >>
+  import: << parameters.import >>
   import_path: << parameters.import_path >>
   prepare: << parameters.prepare >>
 
@@ -384,14 +389,14 @@ orbs:
                   key: dep-{{ checksum "Gopkg.toml" }}-{{ checksum "Gopkg.lock" }}
                   paths:
                   - vendor
-        - unless:
-            condition: << parameters.dep >>
+        - when:
+            condition: << parameters.import >>
             steps:
               - run:
                   name: Get Dependencies
                   command: |
                     source goto.sh
-                    go get << parameters.import_path >>
+                    go get -u << parameters.import_path >>
 
       test:
         parameters:
@@ -1017,13 +1022,9 @@ golang_master_filter: &golang_master_filter
 
 golang_compose: &golang_compose
   dep: false
-  import_path: github.com/docker/libcompose/...
   go_version: 1.10.3
-  prepare:
-    - run:
-        name: Fetch library
-        command: |
-          go get -u github.com/docker/libcompose
+  import: true
+  import_path: github.com/docker/libcompose
 
 version: 2.1
 workflows:
