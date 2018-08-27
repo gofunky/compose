@@ -414,6 +414,7 @@ orbs:
             name: Run Tests
             command: |
               source goto.sh
+              mkdir -pv << parameters.results >>
               trap "go-junit-report < << parameters.results >>/go-<< parameters.name >>-report.out > << parameters.results >>/go-<< parameters.name >>-report.xml" EXIT
               go test -v << parameters.path >> <<# parameters.race >>-short -race <</ parameters.race >>| tee << parameters.results >>/go-<< parameters.name >>-report.out
         - store_artifacts:
