@@ -347,9 +347,6 @@ orbs:
         - run:
             name: Init Golang Source
             command: |
-              mkdir -pv ~/.ssh/ && echo -e "Host github.com\n\tStrictHostKeyChecking no\n" >> ~/.ssh/config
-              apk add --upgrade ca-certificates
-              apk add --no-cache rsync openssh
               URL=`git remote get-url origin`
               URL=`echo "$URL" | sed -e "s/^https:\/\///" -e "s/\.git//" | sed -e "s/^git@//"`
               URL=`echo "$URL" | sed -r 's/github.com:/github.com\//g'`
@@ -1020,14 +1017,13 @@ golang_master_filter: &golang_master_filter
 
 golang_compose: &golang_compose
   dep: false
-  import_path: ./libcompose/...
+  import_path: /go/src/github.com/docker/libcompose/...
   go_version: 1.10.3
   prepare:
     - run:
-        name: Fetch submodules
+        name: Fetch library
         command: |
-          git submodule init
-          git submodule update
+          go get -u github.com/docker/libcompose
 
 version: 2.1
 workflows:
@@ -1044,7 +1040,7 @@ workflows:
         name: test_libcompose
         <<: *golang_compose
         <<: *golang_master_filter
-        path: ./libcompose/...
+        path: /go/src/github.com/docker/libcompose/...
     - goorb/musl:
         name: build_libcompose
         <<: *golang_compose
@@ -1052,7 +1048,7 @@ workflows:
         alpine_version: "3.8"
         upx: true
         output: /go/bin/docker-compose
-        input: ./libcompose/cli/main
+        input: /go/src/github.com/docker/libcompose/cli/main
     - dockerorb/build_test_push:
         name: build_image
         docker_version: 18.06.1
@@ -1062,9 +1058,9 @@ workflows:
         add_labels: true
         # Remove this once CircleCI-Public/config-preview-sdk#15 is merged
         use_args: true
-        args: "DOCKER_VERSION=18.06.0,VERSION=`cd libcompose && git describe --abbrev=0 --tags`"
+        args: "DOCKER_VERSION=18.06.0,VERSION=`cd /go/src/github.com/docker/libcompose && git describe --abbrev=0 --tags`"
         base_tag: compose
-        tags: "gofunky/compose:`cd libcompose && git describe --abbrev=0 --tags`,gofunky/compose:`cd libcompose && git describe --abbrev=0 --tags`-docker18.06.0,gofunky/compose:stable"
+        tags: "gofunky/compose:`cd /go/src/github.com/docker/libcompose && git describe --abbrev=0 --tags`,gofunky/compose:`cd /go/src/github.com/docker/libcompose && git describe --abbrev=0 --tags`-docker18.06.0,gofunky/compose:stable"
         login: docker login -u $DOCKER_USR -p $DOCKER_PWD
         requires:
         - build_libcompose

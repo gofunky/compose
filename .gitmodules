@@ -1,3 +1,0 @@
-[submodule "libcompose"]
-	path = libcompose
-	url = https://github.com/docker/libcompose.git
