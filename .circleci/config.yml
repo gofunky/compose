@@ -3,9 +3,14 @@ go_test_params: &go_test_params
     description: "Path to test results"
     type: string
     default: "/tmp/test-results"
+  path:
+    description: "Package path to test"
+    type: string
+    default: ./...
 
 go_test_args: &go_test_args
   results: << parameters.results >>
+  path: << parameters.path >>
 
 go_prepare_params: &go_prepare_params
   dep:
@@ -35,21 +40,95 @@ go_build_params: &go_build_params
         name: Build
         command: go build -v ./...
 
-go_build: &go_build
-  parameters:
-    <<: *go_prepare_params
-    <<: *go_build_params
-  steps:
-  - prepare:
-      <<: *go_prepare_args
-  - build:
-      building: << parameters.building >>
-
 go_fossa_params: &go_fossa_params
   upload:
     description: "To upload the results to the fossa service"
     type: boolean
     default: false
+
+go_executor_params: &go_executor_params
+  go_version:
+    description: "Golang Version"
+    type: string
+    default: latest
+  goos:
+    description: "Target OS to compile against"
+    type: string
+    default: linux
+  cgo:
+    description: "Disable CGO by setting to '0'"
+    type: enum
+    enum: ["0", "1"]
+    default: "1"
+  goarch:
+    description: "Target architecture to compile against"
+    type: string
+    default: amd64
+
+go_executor_args: &go_executor_args
+  go_version: << parameters.go_version >>
+  goos: << parameters.goos >>
+  cgo: << parameters.cgo >>
+  goarch: << parameters.goarch>>
+
+go_executor_envs: &go_executor_envs
+  GOOS: << parameters.goos >>
+  CGO_ENABLED: << parameters.cgo >>
+  GOARCH: << parameters.goarch >>
+
+go_alpine_params: &go_alpine_params
+  alpine_version:
+    description: "Alpine version"
+    type: string
+    default: ""
+
+go_alpine_args: &go_alpine_args
+  alpine_version: << parameters.alpine_version >>
+
+go_custom_build_params: &go_custom_build_params
+  upx:
+    description: "To use UPX compression on the binaries"
+    type: boolean
+    default: false
+  nodebug:
+    descirption: "Enable ldflags that disable debugging"
+    type: boolean
+    default: false
+  output:
+    description: "Set binary file name"
+    type: string
+    default: ""
+  input:
+    description: "Path to the input files to compile"
+    type: string
+    default: "."
+  flags:
+    description: "Additional ldflags"
+    type: string
+    default: ""
+  rebuild:
+    description: "Always rebuild"
+    type: boolean
+    default: true
+  tags:
+    description: "Build tags"
+    type: string
+    default: ""
+
+go_custom_build_args: &go_custom_build_args
+  upx: << parameters.upx >>
+  nodebug: << parameters.nodebug >>
+  output: << parameters.output >>
+  input: << parameters.input >>
+  flags: << parameters.flags >>
+  rebuild: << parameters.rebuild >>
+  tags: << parameters.tags >>
+
+docker_login_params: &docker_login_params
+  login:
+    description: "Login command to your repository (using environment variables from your secure context)"
+    type: string
+    default: echo "Login is UNSPECIFIED"
 
 docker_arg_params: &docker_arg_params
   # Remove this once CircleCI-Public/config-preview-sdk#15 is merged
@@ -102,6 +181,7 @@ docker_tags_params: &docker_tags_params
   tags:
     description: "Either one or multiple comma-separated Docker tags to apply and push"
     type: string
+    default: ""
 
 docker_build_args: &docker_build_args
   # Remove this once CircleCI-Public/config-preview-sdk#15 is merged
@@ -116,21 +196,40 @@ docker_build_args: &docker_build_args
   attachAt: << parameters.attachAt >>
   addLabels: << parameters.addLabels >>
 
+docker_version_params: &docker_version_params
+  docker_version:
+    description: "Docker version"
+    type: string
+    default: stable
+
 orbs:
   goorb:
     executors:
       default:
+        parameters:
+          <<: *go_executor_params
         docker:
-        - image: gofunky/golang:1.10.3
+        - image: gofunky/golang:<< parameters.go_version >>
         working_directory: ~/app
+        environment:
+          <<: *go_executor_envs
       alpine:
+        parameters:
+          <<: *go_executor_params
+          <<: *go_alpine_params
         docker:
-        - image: gofunky/golang:1.10.3-alpine3.8
+        - image: gofunky/golang:<< parameters.go_version >>-alpine<< parameters.alpine_version >>
         working_directory: ~/app
+        environment:
+          <<: *go_executor_envs
       circleci:
+        parameters:
+          <<: *go_executor_params
         docker:
-        - image: gofunky/golang:1.10.3-circleci
+        - image: gofunky/golang:<< parameters.go_version >>-circleci
         working_directory: ~/app
+        environment:
+          <<: *go_executor_envs
     commands:
       prepare:
         parameters:
@@ -184,51 +283,31 @@ orbs:
                   command: |
                     source goto.sh
                     go get ./...
+
       test:
         parameters:
           <<: *go_test_params
+          name:
+            description: "Unique name to identify the test"
+            type: string
+            default: "test"
+          race:
+            description: "Enable race test"
+            type: boolean
+            default: false
         steps:
         - run:
             name: Run Tests
             command: |
               source goto.sh
-              trap "go-junit-report <<< parameters.results >>/go-test-report.out > << parameters.results >>/go-test-report.xml" EXIT
-              go test -v ./... | tee << parameters.results >>/go-test-report.out
+              trap "go-junit-report <<< parameters.results >>/go-<< parameters.name >>-report.out > << parameters.results >>/go-<< parameters.name >>-report.xml" EXIT
+              go test -v << parameters.path >> <<# parameters.race >>-short -race <</ parameters.race >>| tee << parameters.results >>/go-<< parameters.name >>-report.out
         - store_artifacts:
             path: << parameters.results >>
-            destination: test
+            destination: << parameters.name >>
         - store_test_results:
             path: << parameters.results >>
-      race_test:
-        parameters:
-          <<: *go_test_params
-        steps:
-        - run:
-            name: Run Race Tests
-            command: |
-              source goto.sh
-              trap "go-junit-report <<< parameters.results >>/go-race-test-report.out > << parameters.results >>/go-race-test-report.xml" EXIT
-              go test -v ./... -short -race | tee << parameters.results >>/go-race-test-report.out
-        - store_artifacts:
-            path: << parameters.results >>
-            destination: race-test
-        - store_test_results:
-            path: << parameters.results >>
-      i386_test:
-        parameters:
-          <<: *go_test_params
-        steps:
-        - run:
-            name: Run i386 Tests
-            command: |
-              source goto.sh
-              trap "go-junit-report <<< parameters.results >>/go-386-test-report.out > << parameters.results >>/go-i386-test-report.xml" EXIT
-              env GOOS=linux GOARCH=386 go test -v ./... | tee << parameters.results >>/go-i386-test-report.out
-        - store_artifacts:
-            path: << parameters.results >>
-            destination: i386-test
-        - store_test_results:
-            path: << parameters.results >>
+
       codacy_test:
         parameters:
           <<: *go_test_params
@@ -244,7 +323,7 @@ orbs:
             name: Run Coverage Tests
             command: |
               source goto.sh
-              goverage -v -coverprofile=<< parameters.results >>/coverage.out ./...
+              goverage -v -coverprofile=<< parameters.results >>/coverage.out << parameters.path >>
         - run:
             name: Push Coverage Results
             command: |
@@ -253,6 +332,7 @@ orbs:
         - store_artifacts:
             path: << parameters.results >>
             destination: codacy
+
       codecov_test:
         parameters:
           <<: *go_test_params
@@ -261,7 +341,7 @@ orbs:
             name: Run Coverage Tests
             command: |
               source goto.sh
-              goverage -v -coverprofile=<< parameters.results >>/coverage.txt -covermode=atomic ./...
+              goverage -v -coverprofile=<< parameters.results >>/coverage.txt -covermode=atomic << parameters.path >>
         - run:
             name: Push Coverage Results
             command: |
@@ -270,6 +350,7 @@ orbs:
         - store_artifacts:
             path: << parameters.results >>
             destination: codecov
+
       fossa_test:
         parameters:
           <<: *go_test_params
@@ -297,6 +378,7 @@ orbs:
         - store_artifacts:
             path: << parameters.results >>
             destination: fossa
+
       build:
         parameters:
           <<: *go_build_params
@@ -312,78 +394,250 @@ orbs:
             - src/
             - pkg/
             - bin/
-            - repo.env
+
+      custom_build:
+        parameters:
+          <<: *go_custom_build_params
+        steps:
+        - run:
+            name: Building binary << parameters.output >>
+            command: |
+              source goto.sh
+              output=""
+              if [ -n "<< parameters.output >>" ]; then
+                echo "Output file: << parameters.output >>"
+                output="-o << parameters.output >>"
+              fi
+              tags=""
+              if [ -n "<< parameters.tags >>" ]; then
+                echo "Using tags: << parameters.tags >>"
+                tags="-tags << parameters.tags >>"
+              fi
+              go build $tags $output <<# parameters.rebuild >>-a <</ parameters.rebuild >>-ldflags '<<# parameters.nodebug >>-s -w <</ parameters.nodebug >><< parameters.flags >>' << parameters.input >>
+        - when:
+            condition: << parameters.upx >>
+            steps:
+              - run:
+                  name: Compressing binary using UPX
+                  command: |
+                    source goto.sh
+                    if [ -n "<< parameters.output >>" ]; then
+                      echo "Compressing << parameters.output >>..."
+                      ls -l << parameters.output >>
+                      upx --brute << parameters.output >>
+                      ls -l << parameters.output >>
+                    else
+                      echo "Skipping compression because output is not defined"
+                    fi
+        - save_cache:
+            key: go-{{ .Branch }}-{ checksum "/usr/local/go/bin/go" }-{{ epoch }}
+            paths:
+            - /go/pkg
+        - persist_to_workspace:
+            root: /go
+            paths:
+            - src/
+            - pkg/
+            - bin/
+
     jobs:
       build:
         description: "Build Golang App"
-        executor: default
-        <<: *go_build
-      build-alpine:
-        description: "Build Golang App in Alpine"
-        executor: alpine
-        <<: *go_build
+        parameters:
+          <<: *go_prepare_params
+          <<: *go_build_params
+          <<: *go_executor_params
+        executor:
+          name: default
+          <<: *go_executor_args
+        steps:
+        - prepare:
+            <<: *go_prepare_args
+        - build:
+            building: << parameters.building >>
+
+      build_alpine:
+        description: "Build Golang App on Alpine"
+        parameters:
+          <<: *go_prepare_params
+          <<: *go_build_params
+          <<: *go_executor_params
+          <<: *go_alpine_params
+        executor:
+          name: alpine
+          <<: *go_executor_args
+          <<: *go_alpine_args
+        steps:
+        - prepare:
+            <<: *go_prepare_args
+        - build:
+            building: << parameters.building >>
+
+      custom:
+        description: "Customized Golang Build"
+        parameters:
+          <<: *go_prepare_params
+          <<: *go_build_params
+          <<: *go_executor_params
+          <<: *go_custom_build_params
+        executor:
+          name: default
+          <<: *go_executor_args
+        steps:
+        - prepare:
+            <<: *go_prepare_args
+        - custom_build:
+            <<: *go_custom_build_args
+
+      custom_alpine:
+        description: "Customized Golang Build on Alpine"
+        parameters:
+          <<: *go_prepare_params
+          <<: *go_build_params
+          <<: *go_executor_params
+          <<: *go_custom_build_params
+          <<: *go_alpine_params
+        executor:
+          name: alpine
+          <<: *go_executor_args
+          <<: *go_alpine_args
+        steps:
+        - prepare:
+            <<: *go_prepare_args
+        - custom_build:
+            <<: *go_custom_build_args
+
+      netgo:
+        description: "Golang Build Static with Netgo Package"
+        parameters:
+          <<: *go_prepare_params
+          <<: *go_build_params
+          <<: *go_executor_params
+          <<: *go_custom_build_params
+          <<: *go_alpine_params
+        executor:
+          name: alpine
+          <<: *go_executor_args
+          <<: *go_alpine_args
+          cgo: "0"
+        steps:
+        - prepare:
+            <<: *go_prepare_args
+        - custom_build:
+            <<: *go_custom_build_args
+            tags: "netgo"
+            flags: -extldflags "-static"
+
+      musl:
+        description: "Golang Build Static with Musl Library"
+        parameters:
+          <<: *go_prepare_params
+          <<: *go_build_params
+          <<: *go_executor_params
+          <<: *go_custom_build_params
+          <<: *go_alpine_params
+        executor:
+          name: alpine
+          <<: *go_executor_args
+          <<: *go_alpine_args
+        environment:
+          CC: /usr/local/musl/bin/musl-gcc
+        steps:
+        - prepare:
+            <<: *go_prepare_args
+        - custom_build:
+            <<: *go_custom_build_args
+            flags: -linkmode external -extldflags "-static"
+
       test:
         description: "Test Golang Packages"
-        executor: default
+        executor:
+          name: default
+          <<: *go_executor_args
         parameters:
           <<: *go_prepare_params
           <<: *go_test_params
+          <<: *go_executor_params
         steps:
         - prepare:
             <<: *go_prepare_args
         - test:
             <<: *go_test_args
+
+      i386_test:
+        description: "Test Golang Packages with i386"
+        executor:
+          name: default
+          <<: *go_executor_args
+          goarch: "386"
+        parameters:
+          <<: *go_prepare_params
+          <<: *go_test_params
+          <<: *go_executor_params
+        steps:
+        - prepare:
+            <<: *go_prepare_args
+        - test:
+            name: "i386"
+            <<: *go_test_args
+
       race_test:
         description: "Race Test Golang Packages"
-        executor: default
+        executor:
+          name: default
+          <<: *go_executor_args
         parameters:
           <<: *go_prepare_params
           <<: *go_test_params
+          <<: *go_executor_params
         steps:
         - prepare:
             <<: *go_prepare_args
-        - race_test:
+        - test:
+            name: "race"
+            race: true
             <<: *go_test_args
-      i386_test:
-        description: "Race Test Golang Packages"
-        executor: default
-        parameters:
-          <<: *go_prepare_params
-          <<: *go_test_params
-        steps:
-        - prepare:
-            <<: *go_prepare_args
-        - i386_test:
-            <<: *go_test_args
+
       codacy_test:
         description: "Codacy Coverage Test"
-        executor: default
+        executor:
+          name: default
+          <<: *go_executor_args
         parameters:
           <<: *go_prepare_params
           <<: *go_test_params
+          <<: *go_executor_params
         steps:
         - prepare:
             <<: *go_prepare_args
         - codacy_test:
             <<: *go_test_args
+
       codecov_test:
         description: "Codecov Coverage Test"
-        executor: circleci
+        executor:
+          name: circleci
+          <<: *go_executor_args
         parameters:
           <<: *go_prepare_params
           <<: *go_test_params
+          <<: *go_executor_params
         steps:
         - prepare:
             <<: *go_prepare_args
         - codecov_test:
             <<: *go_test_args
+
       fossa_test:
         description: "Fossa License Test"
-        executor: circleci
+        executor:
+          name: circleci
+          <<: *go_executor_args
         parameters:
           <<: *go_prepare_params
           <<: *go_test_params
           <<: *go_fossa_params
+          <<: *go_executor_params
         steps:
         - prepare:
             <<: *go_prepare_args
@@ -394,26 +648,21 @@ orbs:
   dockerorb:
     executors:
       default:
+        parameters:
+          <<: *docker_version_params
         docker:
-        - image: docker:18.06.0-git
-        working_directory: ~/app
-        environment:
-          IFS: ","
-      compose:
-        docker:
-        - image: gofunky/compose:1.21.2
+        - image: docker:<< parameters.docker_version >>-git
         working_directory: ~/app
         environment:
           IFS: ","
     commands:
       login:
         parameters:
-          login:
-            description: "Login to your repository"
-            type: steps
-            default: []
+          <<: *docker_login_params
         steps:
-        - steps: << parameters.login >>
+        - run:
+            name: "Login to your origin Docker repository"
+            command: << parameters.login >>
       build:
         parameters:
           <<: *docker_arg_params
@@ -538,43 +787,44 @@ orbs:
         - run:
             name: Run Docker compose tests
             command: |
-              docker-compose -f "<< parameters.compose >>" up --exit-code-from sut --build
+              docker-compose -f "<< parameters.compose >>" up --exit-code-from sut --build --abort-on-container-exit
       push:
         parameters:
           <<: *docker_tags_params
-          branch:
-            description: "Only push from the given branch"
-            type: string
         steps:
         - deploy:
             name: Push application Docker image
             command: |
               tags="<< parameters.tags >>"
-              if [ "${CIRCLE_BRANCH}" == "<< parameters.branch >>" ]; then
-                for tag in $tags; do
-                  docker push "$tag"
-                done
-              fi
+              for tag in $tags; do
+                docker push "$tag"
+              done
     jobs:
       build:
         description: "Build Docker image"
-        executor: default
+        executor:
+          name: default
+          docker_version: << parameters.docker_version >>
         parameters:
           <<: *docker_arg_params
           <<: *docker_attach_params
           <<: *docker_build_params
+          <<: *docker_version_params
         steps:
         - build:
             <<: *docker_build_args
 
       build-test:
         description: "Build Docker image"
-        executor: default
+        executor:
+          name: default
+          docker_version: << parameters.docker_version >>
         parameters:
           <<: *docker_arg_params
           <<: *docker_attach_params
           <<: *docker_build_params
           <<: *docker_tags_params
+          <<: *docker_version_params
           compose:
             description: "Path to the docker compose test file to test"
             type: string
@@ -588,23 +838,18 @@ orbs:
         - test:
             compose: << parameters.compose >>
 
-
       build-push:
         description: "Build and push Docker image"
-        executor: default
+        executor:
+          name: default
+          docker_version: << parameters.docker_version >>
         parameters:
           <<: *docker_arg_params
           <<: *docker_attach_params
           <<: *docker_build_params
           <<: *docker_tags_params
-          login:
-            description: "Login to your repository"
-            type: steps
-            default: []
-          branch:
-            description: "Only push from the given branch"
-            type: string
-            default: master
+          <<: *docker_version_params
+          <<: *docker_login_params
         steps:
         - build:
             <<: *docker_build_args
@@ -620,24 +865,19 @@ orbs:
                 login: << parameters.login >>
             - push:
                 tags: << parameters.tags >>
-                branch: << parameters.branch >>
 
       build-test-push:
         description: "Build and push Docker image"
-        executor: default
+        executor:
+          name: default
+          docker_version: << parameters.docker_version >>
         parameters:
           <<: *docker_arg_params
           <<: *docker_attach_params
           <<: *docker_build_params
           <<: *docker_tags_params
-          login:
-            description: "Login to your repository"
-            type: steps
-            default: []
-          branch:
-            description: "Only push from the given branch"
-            type: string
-            default: master
+          <<: *docker_version_params
+          <<: *docker_login_params
           compose:
             description: "Path to the docker compose test file to test"
             type: string
@@ -659,16 +899,56 @@ orbs:
                 login: << parameters.login >>
             - push:
                 tags: << parameters.tags >>
-                branch: << parameters.branch >>
+
+golang_master_filter: &golang_master_filter
+  filters:
+    branches:
+      only:
+      - master
 
 version: 2.1
 workflows:
-  build:
+  readme:
     jobs:
-    - goorb/test
-    - goorb/build-alpine:
+    - readmyhuborb/update:
+        <<: *golang_master_filter
+        name: readme
+        version: 1.1.0
+        context: docker-hub
+  build-master:
+    jobs:
+    - goorb/test:
+        name: test-libcompose
+        go_version: 1.10.3
+        path: ./libcompose/...
+        <<: *golang_master_filter
+    - goorb/musl:
+        name: build-libcompose
+        go_version: 1.10.3
+        alpine_version: 3.8
+        upx: true
+        output: /go/bin/docker-compose
+        input: ./libcompose/cli/main
         requires:
-        - goorb/test
+          - goorb/test
+        <<: *golang_master_filter
+    - dockerorb/build-test-push:
+        name: build-image
+        docker_version: 18.06.1
+        attach: true
+        attachTo: /go
+        context: docker-hub
+        addLabels: true
+        # Remove this once CircleCI-Public/config-preview-sdk#15 is merged
+        useArgs: true
+        args: "DOCKER_VERSION=18.06.0,VERSION=`cd libcompose && git describe --abbrev=0 --tags`"
+        baseTag: compose
+        tags: "gofunky/compose:`cd libcompose && git describe --abbrev=0 --tags`,gofunky/compose:`cd libcompose && git describe --abbrev=0 --tags`-docker18.06.0,gofunky/compose:stable"
+        login: docker login -u $DOCKER_USR -p $DOCKER_PWD
+        requires:
+        - build-libcompose
+        - test-libcompose
+        <<: *golang_master_filter
     #    - dockerorb/build-test-push:
     #        context: docker-hub
     #        # Remove this once CircleCI-Public/config-preview-sdk#15 is merged
@@ -682,15 +962,5 @@ workflows:
     #            name: Login to Docker Hub
     #            command: |
     #              docker login -u $DOCKER_USR -p $DOCKER_PWD
-    - dockerorb/build-test-push:
-        context: docker-hub
-        # Remove this once CircleCI-Public/config-preview-sdk#15 is merged
-        useArgs: true
-        args: "DOCKER_VERSION=18.06.0,COMPOSE_VERSION=1.21.2,VERSION=1.21.2,BUILD_DATE=`date -u +\"%Y-%m-%dT%H:%M:%SZ\"`,VCS_REF=`git rev-parse --short HEAD`"
-        baseTag: "compose"
-        tags: "gofunky/compose:1.21.2,gofunky/compose:1.21"
-        login:
-        - run:
-            name: Login to Docker Hub
-            command: |
-              docker login -u $DOCKER_USR -p $DOCKER_PWD
+    # TODO Add latest tag
+    # TODO Add PR build
