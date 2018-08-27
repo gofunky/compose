@@ -347,13 +347,14 @@ orbs:
         - run:
             name: Init Golang Source
             command: |
+              apk add --no-cache rsync
               URL=`git remote get-url origin`
               URL=`echo "$URL" | sed -e "s/^https:\/\///" -e "s/\.git//" | sed -e "s/^git@//"`
               URL=`echo "$URL" | sed -r 's/github.com:/github.com\//g'`
               REPO="/go/src/$URL"
               mkdir -pv $REPO
-              ln -v -s $REPO .
-              echo "ln -v -n -f -s $REPO . && cd $REPO" > goto.sh
+              rsync -av --delete . $REPO
+              echo "rsync -av --delete $PWD $REPO && cd $REPO" > goto.sh
               chmod +x goto.sh
         - when:
             condition: << parameters.attach >>
