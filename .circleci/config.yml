@@ -153,6 +153,10 @@ go_custom_build_params: &go_custom_build_params
     description: "Build tags"
     type: string
     default: ""
+  static:
+    description: "Build static binary"
+    type: boolean
+    default: false
 
 go_custom_build_args: &go_custom_build_args
   upx: << parameters.upx >>
@@ -162,6 +166,7 @@ go_custom_build_args: &go_custom_build_args
   flags: << parameters.flags >>
   rebuild: << parameters.rebuild >>
   tags: << parameters.tags >>
+  static: << parameters.static >>
 
 docker_login_params: &docker_login_params
   login:
@@ -438,6 +443,7 @@ orbs:
             name: Run Coverage Tests
             command: |
               source goto.sh
+              mkdir -pv << parameters.results >>
               goverage -v -coverprofile=<< parameters.results >>/coverage.out << parameters.path >>
         - run:
             name: Push Coverage Results
@@ -456,6 +462,7 @@ orbs:
             name: Run Coverage Tests
             command: |
               source goto.sh
+              mkdir -pv << parameters.results >>
               goverage -v -coverprofile=<< parameters.results >>/coverage.txt -covermode=atomic << parameters.path >>
         - run:
             name: Push Coverage Results
@@ -482,6 +489,7 @@ orbs:
             name: Run Coverage Tests
             command: |
               source goto.sh
+              mkdir -pv << parameters.results >>
               fossa init
               mv .fossa.yml << parameters.results >>/fossa.yml
         - when:
@@ -527,7 +535,7 @@ orbs:
                 echo "Using tags: << parameters.tags >>"
                 tags="-tags << parameters.tags >>"
               fi
-              go build $tags $output <<# parameters.rebuild >>-a <</ parameters.rebuild >>-ldflags '<<# parameters.nodebug >>-s -w <</ parameters.nodebug >><< parameters.flags >>' << parameters.input >>
+              go build $tags $output <<# parameters.rebuild >>-a <</ parameters.rebuild >>-ldflags '<<# parameters.nodebug >>-s -w <</ parameters.nodebug >><<# parameters.static >>-extldflags "-static" <</ parameters.static >><< parameters.flags >>' << parameters.input >>
         - when:
             condition: << parameters.upx >>
             steps:
@@ -627,11 +635,9 @@ orbs:
           <<: *go_build_params
           <<: *go_executor_params
           <<: *go_custom_build_params
-          <<: *go_alpine_params
         executor:
-          name: alpine
+          name: default
           <<: *go_executor_args
-          <<: *go_alpine_args
           cgo: "0"
         steps:
         - prepare:
@@ -639,7 +645,7 @@ orbs:
         - custom_build:
             <<: *go_custom_build_args
             tags: "netgo"
-            flags: -extldflags "-static"
+            static: true
 
       musl:
         description: "Golang Build Static with Musl Library"
@@ -653,24 +659,40 @@ orbs:
           name: alpine
           <<: *go_executor_args
           <<: *go_alpine_args
-        environment:
-          CC: /usr/local/musl/bin/musl-gcc
         steps:
         - prepare:
             <<: *go_prepare_args
         - custom_build:
             <<: *go_custom_build_args
-            flags: -linkmode external -extldflags "-static"
+            static: true
+            flags: -linkmode external
 
       test:
         description: "Test Golang Packages"
-        executor:
-          name: default
-          <<: *go_executor_args
         parameters:
           <<: *go_prepare_params
           <<: *go_test_params
           <<: *go_executor_params
+        executor:
+          name: default
+          <<: *go_executor_args
+        steps:
+        - prepare:
+            <<: *go_prepare_args
+        - test:
+            <<: *go_test_args
+
+      test_alpine:
+        description: "Test Golang Packages on Alpine"
+        parameters:
+          <<: *go_prepare_params
+          <<: *go_test_params
+          <<: *go_executor_params
+          <<: *go_alpine_params
+        executor:
+          name: alpine
+          <<: *go_executor_args
+          <<: *go_alpine_args
         steps:
         - prepare:
             <<: *go_prepare_args
@@ -1036,41 +1058,41 @@ workflows:
         context: docker-hub
   build:
     jobs:
-    - goorb/test:
+    - goorb/test_alpine:
         name: test_libcompose_yaml
         <<: *golang_compose
         path: github.com/docker/libcompose/yaml
-    - goorb/test:
+    - goorb/test_alpine:
         name: test_libcompose_version
         <<: *golang_compose
         path: github.com/docker/libcompose/version
-    - goorb/test:
+    - goorb/test_alpine:
         name: test_libcompose_utils
         <<: *golang_compose
         path: github.com/docker/libcompose/utils
-    - goorb/test:
+    - goorb/test_alpine:
         name: test_libcompose_lookup
         <<: *golang_compose
         path: github.com/docker/libcompose/lookup
-    - goorb/test:
+    - goorb/test_alpine:
         name: test_libcompose_labels
         <<: *golang_compose
         path: github.com/docker/libcompose/labels
-    - goorb/test:
+    - goorb/test_alpine:
         name: test_libcompose_project
         <<: *golang_compose
         path: github.com/docker/libcompose/project/...
-    - goorb/test:
+    - goorb/test_alpine:
         name: test_libcompose_integration
         <<: *golang_compose
         path: github.com/docker/libcompose/integration/...
         prepare:
         - setup_remote_docker
-    - goorb/test:
+    - goorb/test_alpine:
         name: test_libcompose_docker
         <<: *golang_compose
         path: github.com/docker/libcompose/docker/...
-    - goorb/test:
+    - goorb/test_alpine:
         name: test_libcompose_config
         <<: *golang_compose
         path: github.com/docker/libcompose/config/...
