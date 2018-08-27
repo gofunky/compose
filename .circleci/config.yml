@@ -347,6 +347,7 @@ orbs:
         - run:
             name: Init Golang Source
             command: |
+              apk update
               apk add --upgrade ca-certificates
               apk add --no-cache rsync openssh
               URL=`git remote get-url origin`
