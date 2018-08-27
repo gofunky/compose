@@ -1027,8 +1027,6 @@ workflows:
         upx: true
         output: /go/bin/docker-compose
         input: ./libcompose/cli/main
-        requires:
-          - goorb/test
         <<: *golang_master_filter
     - dockerorb/build-test-push:
         name: build-image
