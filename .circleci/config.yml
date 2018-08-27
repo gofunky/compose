@@ -347,7 +347,7 @@ orbs:
         - run:
             name: Init Golang Source
             command: |
-              apk update
+              mkdir ~/.ssh/ && echo -e "Host github.com\n\tStrictHostKeyChecking no\n" > ~/.ssh/config
               apk add --upgrade ca-certificates
               apk add --no-cache rsync openssh
               URL=`git remote get-url origin`
