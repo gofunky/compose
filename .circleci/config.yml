@@ -1017,7 +1017,7 @@ golang_master_filter: &golang_master_filter
 
 golang_compose: &golang_compose
   dep: false
-  import_path: /go/src/github.com/docker/libcompose/...
+  import_path: github.com/docker/libcompose/...
   go_version: 1.10.3
   prepare:
     - run:
@@ -1040,7 +1040,7 @@ workflows:
         name: test_libcompose
         <<: *golang_compose
         <<: *golang_master_filter
-        path: /go/src/github.com/docker/libcompose/...
+        path: github.com/docker/libcompose/...
     - goorb/musl:
         name: build_libcompose
         <<: *golang_compose
