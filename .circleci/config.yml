@@ -53,12 +53,17 @@ go_prepare_params: &go_prepare_params
     description: "Base path for package import"
     type: string
     default: ./...
+  prepare:
+    description: "Prepare steps after checkout (e.g., chmod)"
+    type: steps
+    default: []
 
 go_prepare_args: &go_prepare_args
   dep: << parameters.dep >>
   attach: << parameters.attach >>
   attach_at: << parameters.attach_at >>
   import_path: << parameters.import_path >>
+  prepare: << parameters.prepare >>
 
 go_build_params: &go_build_params
   building:
@@ -358,6 +363,7 @@ orbs:
         - restore_cache:
             keys:
             - go-{{ .Branch }}-{ checksum "/usr/local/go/bin/go" }
+        - steps: << parameters.prepare >>
         - when:
             condition: << parameters.dep >>
             steps:
@@ -1009,6 +1015,17 @@ golang_master_filter: &golang_master_filter
       only:
       - master
 
+golang_compose: &golang_compose
+  dep: false
+  import_path: ./libcompose/...
+  go_version: 1.10.3
+  prepare:
+    - run:
+        name: Get git submodules
+        command: |
+          git submodule init
+          git submodule update
+
 version: 2.1
 workflows:
   readme:
@@ -1021,22 +1038,18 @@ workflows:
   build_master:
     jobs:
     - goorb/test:
-        dep: false
-        import_path: ./libcompose/...
         name: test_libcompose
-        go_version: 1.10.3
-        path: ./libcompose/...
+        <<: *golang_compose
         <<: *golang_master_filter
+        path: ./libcompose/...
     - goorb/musl:
-        dep: false
-        import_path: ./libcompose/...
         name: build_libcompose
-        go_version: 1.10.3
+        <<: *golang_compose
+        <<: *golang_master_filter
         alpine_version: "3.8"
         upx: true
         output: /go/bin/docker-compose
         input: ./libcompose/cli/main
-        <<: *golang_master_filter
     - dockerorb/build_test_push:
         name: build_image
         docker_version: 18.06.1
