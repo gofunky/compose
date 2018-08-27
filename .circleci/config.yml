@@ -58,6 +58,7 @@ go_prepare_args: &go_prepare_args
   dep: << parameters.dep >>
   attach: << parameters.attach >>
   attach_at: << parameters.attach_at >>
+  import_path: << parameters.import_path >>
 
 go_build_params: &go_build_params
   building:
@@ -1020,12 +1021,14 @@ workflows:
   build_master:
     jobs:
     - goorb/test:
+        dep: false
         import_path: ./libcompose/...
         name: test_libcompose
         go_version: 1.10.3
         path: ./libcompose/...
         <<: *golang_master_filter
     - goorb/musl:
+        dep: false
         import_path: ./libcompose/...
         name: build_libcompose
         go_version: 1.10.3
