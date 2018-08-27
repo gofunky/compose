@@ -349,7 +349,7 @@ orbs:
             command: |
               mkdir -pv ~/.ssh/ && echo -e "Host github.com\n\tStrictHostKeyChecking no\n" >> ~/.ssh/config
               apk add --upgrade ca-certificates
-              apk add --no-cache rsync
+              apk add --no-cache rsync openssh
               URL=`git remote get-url origin`
               URL=`echo "$URL" | sed -e "s/^https:\/\///" -e "s/\.git//" | sed -e "s/^git@//"`
               URL=`echo "$URL" | sed -r 's/github.com:/github.com\//g'`
