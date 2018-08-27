@@ -45,15 +45,19 @@ go_prepare_params: &go_prepare_params
     description: "Attach workspace"
     type: boolean
     default: false
-  attachAt:
+  attach_at:
     description: "Where to attach the workspace"
     type: string
     default: "."
+  import_path:
+    description: "Base path for package import"
+    type: string
+    default: ./...
 
 go_prepare_args: &go_prepare_args
   dep: << parameters.dep >>
   attach: << parameters.attach >>
-  attachAt: << parameters.attachAt >>
+  attach_at: << parameters.attach_at >>
 
 go_build_params: &go_build_params
   building:
@@ -156,7 +160,7 @@ docker_login_params: &docker_login_params
 
 docker_arg_params: &docker_arg_params
   # Remove this once CircleCI-Public/config-preview-sdk#15 is merged
-  useArgs:
+  use_args:
     description: "Enable if you pass args"
     type: boolean
     default: false
@@ -170,7 +174,7 @@ docker_attach_params: &docker_attach_params
     description: "Attach workspace"
     type: boolean
     default: false
-  attachAt:
+  attach_at:
     description: "Where to attach the workspace"
     type: string
     default: "."
@@ -192,11 +196,11 @@ docker_build_params: &docker_build_params
     description: "Build path"
     type: string
     default: "."
-  addLabels:
+  add_labels:
     description: "Add default schema labels"
     type: boolean
     default: false
-  baseTag:
+  base_tag:
     description: "Docker base tag to use"
     type: string
     default: app
@@ -209,16 +213,16 @@ docker_tags_params: &docker_tags_params
 
 docker_build_args: &docker_build_args
   # Remove this once CircleCI-Public/config-preview-sdk#15 is merged
-  useArgs: << parameters.useArgs >>
+  use_args: << parameters.use_args >>
   args: << parameters.args >>
   file: << parameters.file >>
   cache: << parameters.cache >>
   prepare: << parameters.prepare >>
   path: << parameters.path >>
-  baseTag: << parameters.baseTag >>
+  base_tag: << parameters.base_tag >>
   attach: << parameters.attach >>
-  attachAt: << parameters.attachAt >>
-  addLabels: << parameters.addLabels >>
+  attach_at: << parameters.attach_at >>
+  add_labels: << parameters.add_labels >>
 
 docker_version_params: &docker_version_params
   docker_version:
@@ -340,7 +344,7 @@ orbs:
               URL=`git remote get-url origin`
               URL=`echo "$URL" | sed -e "s/^https:\/\///" -e "s/\.git//" | sed -e "s/^git@//"`
               URL=`echo "$URL" | sed -r 's/github.com:/github.com\//g'`
-              REPO="/go/src/$URL/"
+              REPO="/go/src/$URL"
               mkdir -pv $REPO
               ln -s $REPO .
               echo "cd $REPO" > goto.sh
@@ -349,7 +353,7 @@ orbs:
             condition: << parameters.attach >>
             steps:
             - attach_workspace:
-                at: << parameters.attachAt >>
+                at: << parameters.attach_at >>
         - restore_cache:
             keys:
             - go-{{ .Branch }}-{ checksum "/usr/local/go/bin/go" }
@@ -380,7 +384,7 @@ orbs:
                   name: Get Dependencies
                   command: |
                     source goto.sh
-                    go get ./...
+                    go get << parameters.import_path >>
 
       test:
         parameters:
@@ -773,28 +777,28 @@ orbs:
             condition: << parameters.attach >>
             steps:
             - attach_workspace:
-                at: << parameters.attachAt >>
+                at: << parameters.attach_at >>
         - steps: << parameters.prepare >>
         - when:
             condition: << parameters.cache >>
             steps:
             - restore_cache:
                 keys:
-                - docker-<< parameters.path >>-<< parameters.file >>-<< parameters.baseTag >>-{{ .Branch }}
+                - docker-<< parameters.path >>-<< parameters.file >>-<< parameters.base_tag >>-{{ .Branch }}
                 paths:
-                - /caches/<< parameters.baseTag >>.tar
+                - /caches/<< parameters.base_tag >>.tar
             - run:
                 name: Load Docker image layer cache
                 command: |
                   set +o pipefail
-                  docker load -i /caches/<< parameters.baseTag >>.tar | true
+                  docker load -i /caches/<< parameters.base_tag >>.tar | true
         - when:
-            condition: << parameters.useArgs >>
+            condition: << parameters.use_args >>
             # Use this instead once CircleCI-Public/config-preview-sdk#15 is merged
             # matches: ['([a-zA-Z][\w]*=[\w-\/.:]+)(,[a-zA-Z][\w]*=[\w-\/.:]+)*', "<< parameters.args >>"]
             steps:
             - when:
-                condition: << parameters.addLabels >>
+                condition: << parameters.add_labels >>
                 steps:
                 - run:
                     name: Build Docker image with arguments and labels
@@ -804,10 +808,10 @@ orbs:
                       for arg in $args; do
                         buildarg="${buildarg} --build-arg ${arg}"
                       done
-                      build="docker build ${buildarg} --cache-from=<< parameters.baseTag >> -f << parameters.file >> -t << parameters.baseTag >> << parameters.path >>"
+                      build="docker build ${buildarg} --cache-from=<< parameters.base_tag >> -f << parameters.file >> -t << parameters.base_tag >> << parameters.path >>"
                       eval $build
             - unless:
-                condition: << parameters.addLabels >>
+                condition: << parameters.add_labels >>
                 steps:
                 - run:
                     name: Build Docker image with arguments and without labels
@@ -817,27 +821,27 @@ orbs:
                       for arg in $args; do
                         buildarg="${buildarg} --build-arg ${arg}"
                       done
-                      build="docker build ${buildarg} --cache-from=<< parameters.baseTag >> -f << parameters.file >> -t << parameters.baseTag >> << parameters.path >>"
+                      build="docker build ${buildarg} --cache-from=<< parameters.base_tag >> -f << parameters.file >> -t << parameters.base_tag >> << parameters.path >>"
                       eval $build
         - unless:
-            condition: << parameters.useArgs >>
+            condition: << parameters.use_args >>
             # Use this instead once CircleCI-Public/config-preview-sdk#15 is merged
             # matches: ['([a-zA-Z][\w]*=[\w-\/.:]+)(,[a-zA-Z][\w]*=[\w-\/.:]+)*', "<< parameters.args >>"]
             steps:
             - when:
-                condition: << parameters.addLabels >>
+                condition: << parameters.add_labels >>
                 steps:
                 - run:
                     name: Build Docker image without arguments and with labels
                     command: |
-                      docker build --build-arg BUILD_DATE=`date -u +\"%Y-%m-%dT%H:%M:%SZ\"` --build-arg VCS_REF=`git rev-parse --short HEAD` --cache-from=<< parameters.baseTag >> -f << parameters.file >> -t << parameters.baseTag >> << parameters.path >>
+                      docker build --build-arg BUILD_DATE=`date -u +\"%Y-%m-%dT%H:%M:%SZ\"` --build-arg VCS_REF=`git rev-parse --short HEAD` --cache-from=<< parameters.base_tag >> -f << parameters.file >> -t << parameters.base_tag >> << parameters.path >>
             - unless:
-                condition: << parameters.addLabels >>
+                condition: << parameters.add_labels >>
                 steps:
                 - run:
                     name: Build Docker image without arguments and without labels
                     command: |
-                      docker build --cache-from=<< parameters.baseTag >> -f << parameters.file >> -t << parameters.baseTag >> << parameters.path >>
+                      docker build --cache-from=<< parameters.base_tag >> -f << parameters.file >> -t << parameters.base_tag >> << parameters.path >>
         - when:
             condition: << parameters.cache >>
             steps:
@@ -845,15 +849,15 @@ orbs:
                 name: Save Docker image layer cache
                 command: |
                   mkdir -p /caches
-                  docker save -o /caches/<< parameters.baseTag >>.tar << parameters.baseTag >>
+                  docker save -o /caches/<< parameters.base_tag >>.tar << parameters.base_tag >>
             - save_cache:
-                key: docker-<< parameters.path >>-<< parameters.file >>-<< parameters.baseTag >>-{{ .Branch }}-{{ epoch }}
+                key: docker-<< parameters.path >>-<< parameters.file >>-<< parameters.base_tag >>-{{ .Branch }}-{{ epoch }}
                 paths:
-                - /caches/<< parameters.baseTag >>.tar
+                - /caches/<< parameters.base_tag >>.tar
       tag:
         parameters:
           <<: *docker_tags_params
-          baseTag:
+          base_tag:
             description: "Docker base tag to use"
             type: string
             default: app
@@ -863,7 +867,7 @@ orbs:
             command: |
               tags="<< parameters.tags >>"
               for tag in $tags; do
-                docker tag << parameters.baseTag >> "$tag"
+                docker tag << parameters.base_tag >> "$tag"
               done
       test:
         parameters:
@@ -912,7 +916,7 @@ orbs:
         - build:
             <<: *docker_build_args
 
-      build-test:
+      build_test:
         description: "Build Docker image"
         executor:
           name: default
@@ -932,11 +936,11 @@ orbs:
             <<: *docker_build_args
         - tag:
             tags: << parameters.tags >>
-            baseTag: << parameters.baseTag >>
+            base_tag: << parameters.base_tag >>
         - test:
             compose: << parameters.compose >>
 
-      build-push:
+      build_push:
         description: "Build and push Docker image"
         executor:
           name: default
@@ -958,13 +962,13 @@ orbs:
             steps:
             - tag:
                 tags: << parameters.tags >>
-                baseTag: << parameters.baseTag >>
+                base_tag: << parameters.base_tag >>
             - login:
                 login: << parameters.login >>
             - push:
                 tags: << parameters.tags >>
 
-      build-test-push:
+      build_test_push:
         description: "Build and push Docker image"
         executor:
           name: default
@@ -990,7 +994,7 @@ orbs:
             steps:
             - tag:
                 tags: << parameters.tags >>
-                baseTag: << parameters.baseTag >>
+                base_tag: << parameters.base_tag >>
             - test:
                 compose: << parameters.compose >>
             - login:
@@ -1013,45 +1017,47 @@ workflows:
         name: readme
         version: 1.1.0
         context: docker-hub
-  build-master:
+  build_master:
     jobs:
     - goorb/test:
-        name: test-libcompose
+        import_path: ./libcompose/...
+        name: test_libcompose
         go_version: 1.10.3
         path: ./libcompose/...
         <<: *golang_master_filter
     - goorb/musl:
-        name: build-libcompose
+        import_path: ./libcompose/...
+        name: build_libcompose
         go_version: 1.10.3
         alpine_version: "3.8"
         upx: true
         output: /go/bin/docker-compose
         input: ./libcompose/cli/main
         <<: *golang_master_filter
-    - dockerorb/build-test-push:
-        name: build-image
+    - dockerorb/build_test_push:
+        name: build_image
         docker_version: 18.06.1
         attach: true
-        attachAt: /go
+        attach_at: /go
         context: docker-hub
-        addLabels: true
+        add_labels: true
         # Remove this once CircleCI-Public/config-preview-sdk#15 is merged
-        useArgs: true
+        use_args: true
         args: "DOCKER_VERSION=18.06.0,VERSION=`cd libcompose && git describe --abbrev=0 --tags`"
-        baseTag: compose
+        base_tag: compose
         tags: "gofunky/compose:`cd libcompose && git describe --abbrev=0 --tags`,gofunky/compose:`cd libcompose && git describe --abbrev=0 --tags`-docker18.06.0,gofunky/compose:stable"
         login: docker login -u $DOCKER_USR -p $DOCKER_PWD
         requires:
         - build-libcompose
         - test-libcompose
         <<: *golang_master_filter
-    #    - dockerorb/build-test-push:
+    #    - dockerorb/build_test_push:
     #        context: docker-hub
     #        # Remove this once CircleCI-Public/config-preview-sdk#15 is merged
-    #        useArgs: true
+    #        use_args: true
     #        # Latest version
     #        args: "COMPOSE_VERSION=`curl --silent 'https://api.github.com/repos/docker/compose/releases/latest' | grep -o '\"tag_name\": \"\\K.*?(?=\")'`,BUILD_DATE=`date -u +\"%Y-%m-%dT%H:%M:%SZ\"`,VCS_REF=`git rev-parse --short HEAD`"
-    #        baseTag: "compose"
+    #        base_tag: "compose"
     #        tags: "gofunky/compose:latest"
     #        login:
     #        - run:
