@@ -414,7 +414,7 @@ orbs:
             name: Run Tests
             command: |
               source goto.sh
-              trap "go-junit-report <<< parameters.results >>/go-<< parameters.name >>-report.out > << parameters.results >>/go-<< parameters.name >>-report.xml" EXIT
+              trap "go-junit-report < << parameters.results >>/go-<< parameters.name >>-report.out > << parameters.results >>/go-<< parameters.name >>-report.xml" EXIT
               go test -v << parameters.path >> <<# parameters.race >>-short -race <</ parameters.race >>| tee << parameters.results >>/go-<< parameters.name >>-report.out
         - store_artifacts:
             path: << parameters.results >>
@@ -1063,6 +1063,8 @@ workflows:
         name: test_libcompose_integration
         <<: *golang_compose
         path: github.com/docker/libcompose/integration/...
+        prepare:
+        - setup_remote_docker
     - goorb/test:
         name: test_libcompose_docker
         <<: *golang_compose
