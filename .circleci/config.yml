@@ -869,12 +869,10 @@ orbs:
         parameters:
           <<: *go_executor_params
           <<: *go_version_params
-          <<: *go_alpine_params
         executor:
           name: default
           <<: *go_executor_args
           <<: *go_version_args
-          <<: *go_alpine_args
         steps:
         - clean_cache:
             <<: *go_version_args
