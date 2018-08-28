@@ -1218,7 +1218,7 @@ workflows:
         use_args: true
         args: "DOCKER_VERSION=18.06.0,VERSION=`cd /go/src/github.com/docker/libcompose && git describe --abbrev=0 --tags`"
         base_tag: compose
-        tags: "gofunky/compose:`cd /go/src/github.com/docker/libcompose && git describe --abbrev=0 --tags`,gofunky/compose:`cd /go/src/github.com/docker/libcompose && git describe --abbrev=0 --tags`-docker18.06.0,gofunky/compose:stable"
+        tags: "gofunky/compose:`cd /go/src/github.com/docker/libcompose && git describe --abbrev=0 --tags`,gofunky/compose:`wget -O - 'build/docker-compose --version | sed -ne 's/[^0-9]*\(\([0-9]\.\)\{0,4\}[0-9][^.]\).*/\1/p'`-docker18.06.0,gofunky/compose:stable"
         login: docker login -u $DOCKER_USR -p $DOCKER_PWD
         requires:
         - build_libcompose
