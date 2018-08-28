@@ -1157,7 +1157,7 @@ workflows:
         - approve
     - goorb/clean_cache:
         name: clean_golang_cache_circleci
-        go_version: 1.10.4-circleci
+        go_version: 1.9.7-circleci
         requires:
         - approve
   readme:
@@ -1202,7 +1202,7 @@ workflows:
     - goorb/custom:
         name: build_integration_binary
         <<: *golang_compose
-        go_version: 1.10.4-circleci
+        go_version: 1.9.7-circleci
         output: bundles/libcompose-cli
         input: github.com/docker/libcompose/cli/main
         rebuild: false
@@ -1211,7 +1211,7 @@ workflows:
         <<: *golang_compose
         attach: true
         attach_at: /go/src/github.com/docker/libcompose
-        go_version: 1.10.4-circleci
+        go_version: 1.9.7-circleci
         path: github.com/docker/libcompose/integration/...
         prepare:
         - setup_remote_docker
@@ -1220,7 +1220,7 @@ workflows:
     - goorb/test:
         name: test_libcompose_docker
         <<: *golang_compose
-        go_version: 1.10.4-circleci
+        go_version: 1.9.7-circleci
         path: github.com/docker/libcompose/docker/...
         prepare:
         - setup_remote_docker
