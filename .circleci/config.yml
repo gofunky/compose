@@ -392,8 +392,8 @@ orbs:
               URL=`echo "$URL" | sed -r 's/github.com:/github.com\//g'`
               REPO="/go/src/$URL"
               mkdir -pv $REPO
-              unison . $REPO -batch -prefer newer -ignore "Path */.git" -ignore "Path */.circleci"
-              echo "unison $REPO $PWD -batch -prefer newer -ignore "Path */.git" -ignore "Path */.circleci" && cd $REPO" > /go/to.sh
+              unison . $REPO -batch -prefer newer -ignore "Path */.git"
+              echo "unison $REPO $PWD -batch -prefer newer -ignore "Path */.git" && cd $REPO" > /go/to.sh
               chmod +x /go/to.sh
         - steps: << parameters.prepare >>
         - when:
