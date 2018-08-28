@@ -1196,7 +1196,7 @@ workflows:
         <<: *golang_compose
         alpine_version: "3.8"
         path: github.com/docker/libcompose/project/...
-    - goorb/custom_build:
+    - goorb/custom:
         name: build_integration_binary
         <<: *golang_compose
         output: bundles/libcompose-cli
