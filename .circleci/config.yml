@@ -1043,7 +1043,7 @@ golang_master_filter: &golang_master_filter
 
 golang_compose: &golang_compose
   dep: false
-  go_version: 1.10.3
+  go_version: 1.11.0
   import: true
   import_path: github.com/docker/libcompose
 
@@ -1061,40 +1061,47 @@ workflows:
     - goorb/test_alpine:
         name: test_libcompose_yaml
         <<: *golang_compose
+        alpine_version: "3.8"
         path: github.com/docker/libcompose/yaml
     - goorb/test_alpine:
         name: test_libcompose_version
         <<: *golang_compose
+        alpine_version: "3.8"
         path: github.com/docker/libcompose/version
     - goorb/test_alpine:
         name: test_libcompose_utils
         <<: *golang_compose
+        alpine_version: "3.8"
         path: github.com/docker/libcompose/utils
     - goorb/test_alpine:
         name: test_libcompose_lookup
         <<: *golang_compose
+        alpine_version: "3.8"
         path: github.com/docker/libcompose/lookup
     - goorb/test_alpine:
         name: test_libcompose_labels
         <<: *golang_compose
+        alpine_version: "3.8"
         path: github.com/docker/libcompose/labels
     - goorb/test_alpine:
         name: test_libcompose_project
         <<: *golang_compose
+        alpine_version: "3.8"
         path: github.com/docker/libcompose/project/...
-    - goorb/test_alpine:
+    - goorb/test:
         name: test_libcompose_integration
         <<: *golang_compose
         path: github.com/docker/libcompose/integration/...
         prepare:
         - setup_remote_docker
-    - goorb/test_alpine:
+    - goorb/test:
         name: test_libcompose_docker
         <<: *golang_compose
         path: github.com/docker/libcompose/docker/...
     - goorb/test_alpine:
         name: test_libcompose_config
         <<: *golang_compose
+        alpine_version: "3.8"
         path: github.com/docker/libcompose/config/...
     - goorb/musl:
         name: build_libcompose
