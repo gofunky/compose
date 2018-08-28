@@ -1228,8 +1228,6 @@ workflows:
         - test_libcompose_lookup
         - test_libcompose_labels
         - test_libcompose_project
-        - test_libcompose_integration
-        - test_libcompose_docker
         - test_libcompose_config
         <<: *golang_master_filter
     #    - dockerorb/build_test_push:
