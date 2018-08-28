@@ -1203,6 +1203,7 @@ workflows:
     - goorb/custom:
         name: build_integration_binary
         <<: *golang_compose
+        go_version: 1.10.4
         output: bundles/libcompose-cli
         input: github.com/docker/libcompose/cli/main
         rebuild: false
@@ -1211,7 +1212,7 @@ workflows:
         <<: *golang_compose
         attach: true
         attach_at: /go/src/github.com/docker/libcompose
-        go_version: 1.11.0-circleci
+        go_version: 1.10.4-circleci
         path: github.com/docker/libcompose/integration/...
         prepare:
         - setup_remote_docker
