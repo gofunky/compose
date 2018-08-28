@@ -513,9 +513,9 @@ orbs:
             - /go/pkg
             - /go/src
         - persist_to_workspace:
-            root: /go
+            root: .
             paths:
-            - bin/
+            - /go/bin
 
       custom_build:
         parameters:
@@ -557,9 +557,9 @@ orbs:
             - /go/pkg
             - /go/src
         - persist_to_workspace:
-            root: /go
+            root: .
             paths:
-            - bin/<< parameters.output >>
+            - << parameters.output >>
 
     jobs:
       build:
@@ -1115,7 +1115,6 @@ workflows:
         name: build_image
         docker_version: 18.06.1
         attach: true
-        attach_at: /go
         context: docker-hub
         add_labels: true
         # Remove this once CircleCI-Public/config-preview-sdk#15 is merged
