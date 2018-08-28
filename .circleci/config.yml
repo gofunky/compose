@@ -87,6 +87,7 @@ go_build_params: &go_build_params
         key: go-{{ .Branch }}-{{ epoch }}
         paths:
         - /go/tmp
+        - ~/.unison
     - persist_to_workspace:
         root: .
         paths:
@@ -391,8 +392,8 @@ orbs:
               URL=`echo "$URL" | sed -r 's/github.com:/github.com\//g'`
               REPO="/go/src/$URL"
               mkdir -pv $REPO
-              unison -batch -prefer . $REPO
-              echo "unison -batch -prefer $REPO $PWD && cd $REPO" > /go/to.sh
+              unison -batch godir -prefer . $REPO
+              echo "unison -batch godir -prefer $REPO $PWD && cd $REPO" > /go/to.sh
               chmod +x /go/to.sh
         - steps: << parameters.prepare >>
         - when:
@@ -577,6 +578,7 @@ orbs:
                 - /go/pkg
                 - /go/src
                 - /go/tmp
+                - ~/.unison
         - persist_to_workspace:
             root: .
             paths:
@@ -595,12 +597,14 @@ orbs:
               rm -rf /go/src/.[a-z]*
               rm -rf /go/tmp/*
               rm -rf /go/tmp/.[a-z]*
+              mkdir -pv ~/.unison
         - save_cache:
             key: go-{{ .Branch }}-<< parameters.go_version >>-{{ epoch }}
             paths:
             - /go/pkg
             - /go/src
             - /go/tmp
+            - ~/.unison
 
     jobs:
       build:
