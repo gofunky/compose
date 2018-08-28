@@ -871,7 +871,7 @@ orbs:
           <<: *go_version_params
           <<: *go_alpine_params
         executor:
-          name: alpine
+          name: default
           <<: *go_executor_args
           <<: *go_version_args
           <<: *go_alpine_args
@@ -1153,12 +1153,12 @@ workflows:
     - approve:
         type: approval
     - goorb/clean_cache:
-        name: clean_golang_cache
+        name: clean_golang_cache_default
         go_version: 1.11.0
         requires:
         - approve
     - goorb/clean_cache:
-        name: clean_golang_cache
+        name: clean_golang_cache_circleci
         go_version: 1.10.4-circleci
         requires:
         - approve
