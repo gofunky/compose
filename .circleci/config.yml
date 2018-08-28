@@ -1150,10 +1150,13 @@ version: 2.1
 workflows:
   cleanup:
     jobs:
+    - approve:
+        type: approval
     - goorb/clean_cache:
         name: clean_golang_cache
         go_version: 1.11.0
-        type: approval
+        requires:
+        - approve
   readme:
     jobs:
     - readmyhuborb/update:
