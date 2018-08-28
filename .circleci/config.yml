@@ -563,7 +563,7 @@ orbs:
             condition: << parameters.rebuild >>
             steps:
             - save_cache:
-                key: go-{{ .Branch }}-{ checksum "/usr/local/go/bin/go" }-{{ epoch }}
+                key: go-{{ .Branch }}-{ checksum "/usr/local/go/bin/go" }-{ checksum "<< parameters.output >>" }
                 paths:
                 - /go/pkg
                 - /go/src
@@ -572,6 +572,24 @@ orbs:
             root: .
             paths:
             - << parameters.output >>
+
+      clean_cache:
+        steps:
+        - run:
+            name: Cleanup
+            command: |
+              rm -rf /go/pkg/*
+              rm -rf /go/pkg/.[a-z]*
+              rm -rf /go/src/*
+              rm -rf /go/src/.[a-z]*
+              rm -rf /go/tmp/*
+              rm -rf /go/tmp/.[a-z]*
+        - save_cache:
+            key: go-{{ .Branch }}-{ checksum "/usr/local/go/bin/go" }-{{ epoch }}
+            paths:
+            - /go/pkg
+            - /go/src
+            - /go/tmp
 
     jobs:
       build:
@@ -791,6 +809,15 @@ orbs:
         - fossa_test:
             <<: *go_test_args
             upload: << parameters.upload >>
+
+      clean_cache:
+        description: "Clear the cache"
+        executor:
+          name: alpine
+          <<: *go_executor_args
+          <<: *go_alpine_args
+          steps:
+          - clean_cache
 
   dockerorb:
     executors:
@@ -1061,6 +1088,12 @@ golang_compose: &golang_compose
 
 version: 2.1
 workflows:
+  cleanup:
+    jobs:
+    - goorb/clean_cache:
+        name: clean_golang_cache
+        go_version: 1.11.0
+        type: approval
   readme:
     jobs:
     - readmyhuborb/update:
