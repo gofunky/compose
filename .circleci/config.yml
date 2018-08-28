@@ -392,8 +392,8 @@ orbs:
               URL=`echo "$URL" | sed -r 's/github.com:/github.com\//g'`
               REPO="/go/src/$URL"
               mkdir -pv $REPO
-              unison -batch godir -prefer . $REPO
-              echo "unison -batch godir -prefer $REPO $PWD && cd $REPO" > /go/to.sh
+              unison -batch $REPO -prefer .
+              echo "unison -batch $PWD -prefer $REPO && cd $REPO" > /go/to.sh
               chmod +x /go/to.sh
         - steps: << parameters.prepare >>
         - when:
