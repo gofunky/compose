@@ -811,15 +811,15 @@ orbs:
             upload: << parameters.upload >>
 
       clean_cache:
+        description: "Clear the cache"
         parameters:
           <<: *go_executor_params
           <<: *go_alpine_params
-        description: "Clear the cache"
         executor:
           name: alpine
           <<: *go_executor_args
           <<: *go_alpine_args
-          steps:
+        steps:
           - clean_cache
 
   dockerorb:
