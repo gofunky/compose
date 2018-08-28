@@ -1157,6 +1157,11 @@ workflows:
         go_version: 1.11.0
         requires:
         - approve
+    - goorb/clean_cache:
+        name: clean_golang_cache
+        go_version: 1.10.4-circleci
+        requires:
+        - approve
   readme:
     jobs:
     - readmyhuborb/update:
