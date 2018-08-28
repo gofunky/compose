@@ -87,7 +87,6 @@ go_build_params: &go_build_params
         key: go-{{ .Branch }}-{{ epoch }}
         paths:
         - /go/tmp
-        - ~/.unison
     - persist_to_workspace:
         root: .
         paths:
@@ -578,7 +577,6 @@ orbs:
                 - /go/pkg
                 - /go/src
                 - /go/tmp
-                - ~/.unison
         - persist_to_workspace:
             root: .
             paths:
@@ -597,14 +595,12 @@ orbs:
               rm -rf /go/src/.[a-z]*
               rm -rf /go/tmp/*
               rm -rf /go/tmp/.[a-z]*
-              mkdir -pv ~/.unison
         - save_cache:
             key: go-{{ .Branch }}-<< parameters.go_version >>-{{ epoch }}
             paths:
             - /go/pkg
             - /go/src
             - /go/tmp
-            - ~/.unison
 
     jobs:
       build:
@@ -1221,7 +1217,7 @@ workflows:
     - goorb/test:
         name: test_libcompose_docker
         <<: *golang_compose
-        go_version: 1.11.0-circleci
+        go_version: 1.10.4-circleci
         path: github.com/docker/libcompose/docker/...
         prepare:
         - setup_remote_docker
