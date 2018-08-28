@@ -1155,11 +1155,6 @@ workflows:
         go_version: 1.11.0
         requires:
         - approve
-    - goorb/clean_cache:
-        name: clean_golang_cache_circleci
-        go_version: 1.9.7-circleci
-        requires:
-        - approve
   readme:
     jobs:
     - readmyhuborb/update:
@@ -1199,31 +1194,6 @@ workflows:
         <<: *golang_compose
         alpine_version: "3.8"
         path: github.com/docker/libcompose/project/...
-    - goorb/custom:
-        name: build_integration_binary
-        <<: *golang_compose
-        go_version: 1.9.7-circleci
-        output: bundles/libcompose-cli
-        input: github.com/docker/libcompose/cli/main
-        rebuild: false
-    - goorb/test:
-        name: test_libcompose_integration
-        <<: *golang_compose
-        attach: true
-        attach_at: /go/src/github.com/docker/libcompose
-        go_version: 1.9.7-circleci
-        path: github.com/docker/libcompose/integration/...
-        prepare:
-        - setup_remote_docker
-        requires:
-        - build_integration_binary
-    - goorb/test:
-        name: test_libcompose_docker
-        <<: *golang_compose
-        go_version: 1.9.7-circleci
-        path: github.com/docker/libcompose/docker/...
-        prepare:
-        - setup_remote_docker
     - goorb/test_alpine:
         name: test_libcompose_config
         <<: *golang_compose
