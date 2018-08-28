@@ -77,7 +77,20 @@ go_build_params: &go_build_params
     default:
     - run:
         name: Build
-        command: go build -v ./...
+        command: |
+          source /go/to.sh
+          mkdir -pv build
+          cd build
+          go build -v ../...
+          source /go/to.sh
+    - save_cache:
+        key: go-{{ .Branch }}-{ checksum "/usr/local/go/bin/go" }-{{ epoch }}
+        paths:
+        - /go/tmp
+    - persist_to_workspace:
+        root: .
+        paths:
+        - build/*
 
 go_fossa_params: &go_fossa_params
   upload:
@@ -371,8 +384,8 @@ orbs:
               REPO="/go/src/$URL"
               mkdir -pv $REPO
               rsync -av . $REPO
-              echo "rsync -av $PWD $REPO && cd $REPO" > goto.sh
-              chmod +x goto.sh
+              echo "rsync -av $PWD $REPO && cd $REPO" > /go/to.sh
+              chmod +x /go/to.sh
         - steps: << parameters.prepare >>
         - when:
             condition: << parameters.dep >>
@@ -382,7 +395,7 @@ orbs:
               - run:
                   name: Update dependencies
                   command: |
-                    source goto.sh
+                    source /go/to.sh
                     if [ -e "Gopkg.toml" ]; then
                       echo "Fetching vendor folder"
                       dep ensure -v -vendor-only
@@ -390,6 +403,7 @@ orbs:
                       echo "Initializing dependencies"
                       dep init -v
                     fi
+                    source /go/to.sh
               - save_cache:
                   key: dep-{{ checksum "Gopkg.toml" }}-{{ checksum "Gopkg.lock" }}
                   paths:
@@ -400,7 +414,7 @@ orbs:
               - run:
                   name: Get Dependencies
                   command: |
-                    source goto.sh
+                    source /go/to.sh
                     go get -u << parameters.import_path >>
 
       test:
@@ -418,7 +432,7 @@ orbs:
         - run:
             name: Run Tests
             command: |
-              source goto.sh
+              source /go/to.sh
               mkdir -pv << parameters.results >>
               trap "go-junit-report < << parameters.results >>/go-<< parameters.name >>-report.out > << parameters.results >>/go-<< parameters.name >>-report.xml" EXIT
               go test -v << parameters.path >> <<# parameters.race >>-short -race <</ parameters.race >>| tee << parameters.results >>/go-<< parameters.name >>-report.out
@@ -442,13 +456,13 @@ orbs:
         - run:
             name: Run Coverage Tests
             command: |
-              source goto.sh
+              source /go/to.sh
               mkdir -pv << parameters.results >>
               goverage -v -coverprofile=<< parameters.results >>/coverage.out << parameters.path >>
         - run:
             name: Push Coverage Results
             command: |
-              source goto.sh
+              source /go/to.sh
               godacov -t $CODACY_TOKEN -r << parameters.results >>/coverage.out -c $CIRCLE_SHA1 || true
         - store_artifacts:
             path: << parameters.results >>
@@ -461,13 +475,13 @@ orbs:
         - run:
             name: Run Coverage Tests
             command: |
-              source goto.sh
+              source /go/to.sh
               mkdir -pv << parameters.results >>
               goverage -v -coverprofile=<< parameters.results >>/coverage.txt -covermode=atomic << parameters.path >>
         - run:
             name: Push Coverage Results
             command: |
-              source goto.sh
+              source /go/to.sh
               wget -O - https://codecov.io/bash | bash
         - store_artifacts:
             path: << parameters.results >>
@@ -488,7 +502,7 @@ orbs:
         - run:
             name: Run Coverage Tests
             command: |
-              source goto.sh
+              source /go/to.sh
               mkdir -pv << parameters.results >>
               fossa init
               mv .fossa.yml << parameters.results >>/fossa.yml
@@ -507,15 +521,6 @@ orbs:
           <<: *go_build_params
         steps:
         - steps: << parameters.building >>
-        - save_cache:
-            key: go-{{ .Branch }}-{ checksum "/usr/local/go/bin/go" }-{{ epoch }}
-            paths:
-            - /go/pkg
-            - /go/src
-        - persist_to_workspace:
-            root: .
-            paths:
-            - /go/bin
 
       custom_build:
         parameters:
@@ -524,7 +529,7 @@ orbs:
         - run:
             name: Building binary << parameters.output >>
             command: |
-              source goto.sh
+              source /go/to.sh
               output=""
               if [ -n "<< parameters.output >>" ]; then
                 echo "Output file: << parameters.output >>"
@@ -542,7 +547,7 @@ orbs:
               - run:
                   name: Compressing binary using UPX
                   command: |
-                    source goto.sh
+                    source /go/to.sh
                     if [ -n "<< parameters.output >>" ]; then
                       echo "Compressing << parameters.output >>..."
                       ls -l << parameters.output >>
@@ -551,11 +556,18 @@ orbs:
                     else
                       echo "Skipping compression because output is not defined"
                     fi
-        - save_cache:
-            key: go-{{ .Branch }}-{ checksum "/usr/local/go/bin/go" }-{{ epoch }}
-            paths:
-            - /go/pkg
-            - /go/src
+        - run:
+            name: Final sync
+            command: source /go/to.sh
+        - unless:
+            condition: << parameters.rebuild >>
+            steps:
+            - save_cache:
+                key: go-{{ .Branch }}-{ checksum "/usr/local/go/bin/go" }-{{ epoch }}
+                paths:
+                - /go/pkg
+                - /go/src
+                - /go/tmp
         - persist_to_workspace:
             root: .
             paths:
@@ -1091,14 +1103,17 @@ workflows:
     - goorb/test:
         name: test_libcompose_integration
         <<: *golang_compose
-        go_version: 1.10.3-circleci
+        go_version: 1.11.0-circleci
         path: github.com/docker/libcompose/integration/...
         prepare:
         - setup_remote_docker
     - goorb/test:
         name: test_libcompose_docker
         <<: *golang_compose
+        go_version: 1.11.0-circleci
         path: github.com/docker/libcompose/docker/...
+        prepare:
+        - setup_remote_docker
     - goorb/test_alpine:
         name: test_libcompose_config
         <<: *golang_compose
@@ -1107,9 +1122,11 @@ workflows:
     - goorb/musl:
         name: build_libcompose
         <<: *golang_compose
+        rebuild: false
         alpine_version: "3.8"
+        nodebug: true
         upx: true
-        output: /go/bin/docker-compose
+        output: build/docker-compose
         input: github.com/docker/libcompose/cli/main
     - dockerorb/build_test_push:
         name: build_image

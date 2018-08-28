@@ -2,7 +2,7 @@ ARG DOCKER_VERSION=stable
 FROM docker:${DOCKER_VERSION}-git
 MAINTAINER matfax <mat@fax.fyi>
 
-COPY /go/bin/docker-compose /usr/local/bin/docker-compose
+COPY ./build/docker-compose /usr/local/bin/docker-compose
 
 ARG BUILD_DATE
 ARG VCS_REF
