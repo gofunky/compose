@@ -1206,7 +1206,7 @@ workflows:
         name: test_libcompose_integration
         <<: *golang_compose
         attach: true
-        attach_to: /go/src/github.com/docker/libcompose
+        attach_at: /go/src/github.com/docker/libcompose
         go_version: 1.11.0-circleci
         path: github.com/docker/libcompose/integration/...
         prepare:
