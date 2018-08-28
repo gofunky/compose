@@ -84,7 +84,7 @@ go_build_params: &go_build_params
           go build -v ../...
           source /go/to.sh
     - save_cache:
-        key: go-{{ .Branch }}-{ checksum "/usr/local/go/bin/go" }-{{ epoch }}
+        key: go-{{ .Branch }}-{{ epoch }}
         paths:
         - /go/tmp
     - persist_to_workspace:
@@ -98,11 +98,16 @@ go_fossa_params: &go_fossa_params
     type: boolean
     default: false
 
-go_executor_params: &go_executor_params
+go_version_params: &go_version_params
   go_version:
     description: "Golang Version"
     type: string
     default: latest
+
+go_version_args: &go_version_args
+  go_version: << parameters.go_version >>
+
+go_executor_params: &go_executor_params
   goos:
     description: "Target OS to compile against"
     type: string
@@ -118,7 +123,6 @@ go_executor_params: &go_executor_params
     default: amd64
 
 go_executor_args: &go_executor_args
-  go_version: << parameters.go_version >>
   goos: << parameters.goos >>
   cgo: << parameters.cgo >>
   goarch: << parameters.goarch>>
@@ -339,6 +343,7 @@ orbs:
       default:
         parameters:
           <<: *go_executor_params
+          <<: *go_version_params
         docker:
         - image: gofunky/golang:<< parameters.go_version >>
         working_directory: ~/app
@@ -347,6 +352,7 @@ orbs:
       alpine:
         parameters:
           <<: *go_executor_params
+          <<: *go_version_params
           <<: *go_alpine_params
         docker:
         - image: gofunky/golang:<< parameters.go_version >>-alpine<< parameters.alpine_version >>
@@ -356,6 +362,7 @@ orbs:
       circleci:
         parameters:
           <<: *go_executor_params
+          <<: *go_version_params
         docker:
         - image: gofunky/golang:<< parameters.go_version >>-circleci
         working_directory: ~/app
@@ -365,6 +372,7 @@ orbs:
       prepare:
         parameters:
           <<: *go_prepare_params
+          <<: *go_version_params
         steps:
         - checkout
         - when:
@@ -374,7 +382,7 @@ orbs:
                 at: << parameters.attach_at >>
         - restore_cache:
             keys:
-            - go-{{ .Branch }}-{ checksum "/usr/local/go/bin/go" }
+            - go-{{ .Branch }}-<< parameters.go_version >>
         - run:
             name: Init Golang Source
             command: |
@@ -391,7 +399,7 @@ orbs:
             condition: << parameters.dep >>
             steps:
               - restore_cache:
-                  key: dep-
+                  key: dep-<< parameters.go_version >>
               - run:
                   name: Update dependencies
                   command: |
@@ -405,7 +413,7 @@ orbs:
                     fi
                     source /go/to.sh
               - save_cache:
-                  key: dep-{{ checksum "Gopkg.toml" }}-{{ checksum "Gopkg.lock" }}
+                  key: dep-<< parameters.go_version >>-{{ checksum "Gopkg.toml" }}-{{ checksum "Gopkg.lock" }}
                   paths:
                   - vendor
         - when:
@@ -525,6 +533,7 @@ orbs:
       custom_build:
         parameters:
           <<: *go_custom_build_params
+          <<: *go_version_params
         steps:
         - run:
             name: Building binary << parameters.output >>
@@ -563,7 +572,7 @@ orbs:
             condition: << parameters.rebuild >>
             steps:
             - save_cache:
-                key: go-{{ .Branch }}-{ checksum "/usr/local/go/bin/go" }-{ checksum "<< parameters.output >>" }
+                key: go-{{ .Branch }}-<< parameters.go_version >>-{ checksum "<< parameters.output >>" }
                 paths:
                 - /go/pkg
                 - /go/src
@@ -574,6 +583,8 @@ orbs:
             - << parameters.output >>
 
       clean_cache:
+        parameters:
+          <<: *go_version_params
         steps:
         - run:
             name: Cleanup
@@ -585,7 +596,7 @@ orbs:
               rm -rf /go/tmp/*
               rm -rf /go/tmp/.[a-z]*
         - save_cache:
-            key: go-{{ .Branch }}-{ checksum "/usr/local/go/bin/go" }-{{ epoch }}
+            key: go-{{ .Branch }}-<< parameters.go_version >>-{{ epoch }}
             paths:
             - /go/pkg
             - /go/src
@@ -598,12 +609,15 @@ orbs:
           <<: *go_prepare_params
           <<: *go_build_params
           <<: *go_executor_params
+          <<: *go_version_params
         executor:
           name: default
           <<: *go_executor_args
+          <<: *go_version_args
         steps:
         - prepare:
             <<: *go_prepare_args
+            <<: *go_version_args
         - build:
             building: << parameters.building >>
 
@@ -613,14 +627,17 @@ orbs:
           <<: *go_prepare_params
           <<: *go_build_params
           <<: *go_executor_params
+          <<: *go_version_params
           <<: *go_alpine_params
         executor:
           name: alpine
           <<: *go_executor_args
+          <<: *go_version_args
           <<: *go_alpine_args
         steps:
         - prepare:
             <<: *go_prepare_args
+            <<: *go_version_args
         - build:
             building: << parameters.building >>
 
@@ -630,15 +647,19 @@ orbs:
           <<: *go_prepare_params
           <<: *go_build_params
           <<: *go_executor_params
+          <<: *go_version_params
           <<: *go_custom_build_params
         executor:
           name: default
           <<: *go_executor_args
+          <<: *go_version_args
         steps:
         - prepare:
             <<: *go_prepare_args
+            <<: *go_version_args
         - custom_build:
             <<: *go_custom_build_args
+            <<: *go_version_args
 
       custom_alpine:
         description: "Customized Golang Build on Alpine"
@@ -646,17 +667,21 @@ orbs:
           <<: *go_prepare_params
           <<: *go_build_params
           <<: *go_executor_params
+          <<: *go_version_params
           <<: *go_custom_build_params
           <<: *go_alpine_params
         executor:
           name: alpine
           <<: *go_executor_args
+          <<: *go_version_args
           <<: *go_alpine_args
         steps:
         - prepare:
             <<: *go_prepare_args
+            <<: *go_version_args
         - custom_build:
             <<: *go_custom_build_args
+            <<: *go_version_args
 
       netgo:
         description: "Golang Build Static with Netgo Package"
@@ -664,16 +689,20 @@ orbs:
           <<: *go_prepare_params
           <<: *go_build_params
           <<: *go_executor_params
+          <<: *go_version_params
           <<: *go_custom_build_params
         executor:
           name: default
           <<: *go_executor_args
+          <<: *go_version_args
           cgo: "0"
         steps:
         - prepare:
             <<: *go_prepare_args
+            <<: *go_version_args
         - custom_build:
             <<: *go_custom_build_args
+            <<: *go_version_args
             tags: "netgo"
             static: true
 
@@ -683,17 +712,21 @@ orbs:
           <<: *go_prepare_params
           <<: *go_build_params
           <<: *go_executor_params
+          <<: *go_version_params
           <<: *go_custom_build_params
           <<: *go_alpine_params
         executor:
           name: alpine
           <<: *go_executor_args
+          <<: *go_version_args
           <<: *go_alpine_args
         steps:
         - prepare:
             <<: *go_prepare_args
+            <<: *go_version_args
         - custom_build:
             <<: *go_custom_build_args
+            <<: *go_version_args
             static: true
             flags: -linkmode external
 
@@ -703,12 +736,15 @@ orbs:
           <<: *go_prepare_params
           <<: *go_test_params
           <<: *go_executor_params
+          <<: *go_version_params
         executor:
           name: default
           <<: *go_executor_args
+          <<: *go_version_args
         steps:
         - prepare:
             <<: *go_prepare_args
+            <<: *go_version_args
         - test:
             <<: *go_test_args
 
@@ -718,14 +754,17 @@ orbs:
           <<: *go_prepare_params
           <<: *go_test_params
           <<: *go_executor_params
+          <<: *go_version_params
           <<: *go_alpine_params
         executor:
           name: alpine
           <<: *go_executor_args
+          <<: *go_version_args
           <<: *go_alpine_args
         steps:
         - prepare:
             <<: *go_prepare_args
+            <<: *go_version_args
         - test:
             <<: *go_test_args
 
@@ -734,14 +773,17 @@ orbs:
         executor:
           name: default
           <<: *go_executor_args
+          <<: *go_version_args
           goarch: "386"
         parameters:
           <<: *go_prepare_params
           <<: *go_test_params
           <<: *go_executor_params
+          <<: *go_version_params
         steps:
         - prepare:
             <<: *go_prepare_args
+            <<: *go_version_args
         - test:
             name: "i386"
             <<: *go_test_args
@@ -751,13 +793,16 @@ orbs:
         executor:
           name: default
           <<: *go_executor_args
+          <<: *go_version_args
         parameters:
           <<: *go_prepare_params
           <<: *go_test_params
           <<: *go_executor_params
+          <<: *go_version_params
         steps:
         - prepare:
             <<: *go_prepare_args
+            <<: *go_version_args
         - test:
             name: "race"
             race: true
@@ -768,13 +813,16 @@ orbs:
         executor:
           name: default
           <<: *go_executor_args
+          <<: *go_version_args
         parameters:
           <<: *go_prepare_params
           <<: *go_test_params
           <<: *go_executor_params
+          <<: *go_version_params
         steps:
         - prepare:
             <<: *go_prepare_args
+            <<: *go_version_args
         - codacy_test:
             <<: *go_test_args
 
@@ -783,13 +831,16 @@ orbs:
         executor:
           name: circleci
           <<: *go_executor_args
+          <<: *go_version_args
         parameters:
           <<: *go_prepare_params
           <<: *go_test_params
           <<: *go_executor_params
+          <<: *go_version_params
         steps:
         - prepare:
             <<: *go_prepare_args
+            <<: *go_version_args
         - codecov_test:
             <<: *go_test_args
 
@@ -798,14 +849,17 @@ orbs:
         executor:
           name: circleci
           <<: *go_executor_args
+          <<: *go_version_args
         parameters:
           <<: *go_prepare_params
           <<: *go_test_params
           <<: *go_fossa_params
           <<: *go_executor_params
+          <<: *go_version_params
         steps:
         - prepare:
             <<: *go_prepare_args
+            <<: *go_version_args
         - fossa_test:
             <<: *go_test_args
             upload: << parameters.upload >>
@@ -814,13 +868,16 @@ orbs:
         description: "Clear the cache"
         parameters:
           <<: *go_executor_params
+          <<: *go_version_params
           <<: *go_alpine_params
         executor:
           name: alpine
           <<: *go_executor_args
+          <<: *go_version_args
           <<: *go_alpine_args
         steps:
-          - clean_cache
+        - clean_cache:
+            <<: *go_version_args
 
   dockerorb:
     executors:
