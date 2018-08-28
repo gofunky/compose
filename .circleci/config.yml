@@ -559,7 +559,7 @@ orbs:
         - persist_to_workspace:
             root: /go
             paths:
-            - bin/
+            - bin/<< parameters.output >>
 
     jobs:
       build:
@@ -1091,6 +1091,7 @@ workflows:
     - goorb/test:
         name: test_libcompose_integration
         <<: *golang_compose
+        go_version: 1.10.3-circleci
         path: github.com/docker/libcompose/integration/...
         prepare:
         - setup_remote_docker
