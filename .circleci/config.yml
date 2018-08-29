@@ -385,11 +385,11 @@ orbs:
           <<: *envorb_params
         steps:
         - run:
-          name: Match the semantic version
-          command: |
-            source ./env/load.sh
-            << parameters.variable >>=$(${<< parameters.variable >>} | sed -nre 's/^[^0-9]*(([0-9]+\.)*[0-9]+).*/\1/p')
-            echo "${<< parameters.variable >>}" > ./env/<< parameters.variable >>.env
+            name: Match the semantic version
+            command: |
+              source ./env/load.sh
+              << parameters.variable >>=$(${<< parameters.variable >>} | sed -nre 's/^[^0-9]*(([0-9]+\.)*[0-9]+).*/\1/p')
+              echo "${<< parameters.variable >>}" > ./env/<< parameters.variable >>.env
 
       complete:
         parameters:
@@ -1223,7 +1223,7 @@ orbs:
             - run:
                 name: Build Docker image with arguments and labels
                 command: |
-                  ./env/load.sh | true
+                  source ./env/load.sh | true
                   buildarg=""
                   args="<< parameters.args >><<# parameters.add_labels >>,BUILD_DATE=`date -u +\"%Y-%m-%dT%H:%M:%SZ\"`,VCS_REF=`git rev-parse --short HEAD`<</ parameters.add_labels >>"
                   for arg in $args; do
@@ -1239,7 +1239,7 @@ orbs:
             - run:
                 name: Build Docker image without arguments and with labels
                 command: |
-                  ./env/load.sh | true
+                  source ./env/load.sh | true
                   docker build <<# parameters.add_labels >>--build-arg BUILD_DATE=`date -u +\"%Y-%m-%dT%H:%M:%SZ\"` --build-arg VCS_REF=`git rev-parse --short HEAD` <</ parameters.add_labels >>--cache-from=<< parameters.base_tag >> -f << parameters.file >> -t << parameters.base_tag >> << parameters.path >>
         - when:
             condition: << parameters.cache >>
@@ -1264,7 +1264,7 @@ orbs:
         - run:
             name: Add Docker tags
             command: |
-              ./env/load.sh | true
+              source ./env/load.sh | true
               tags="<< parameters.tags >>"
               for tag in $tags; do
                 docker tag << parameters.base_tag >> "$tag"
@@ -1297,7 +1297,7 @@ orbs:
         - deploy:
             name: Push application Docker image
             command: |
-              ./env/load.sh | true
+              source ./env/load.sh | true
               tags="<< parameters.tags >>"
               for tag in $tags; do
                 docker push "$tag"
