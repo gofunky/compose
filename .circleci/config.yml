@@ -526,7 +526,7 @@ orbs:
             <<: *envorb_args
             address: https://api.github.com/repos/<< parameters.repository >>/releases/latest
         - cmd:
-            cmd: ${<< parameters.variable >>} | grep -o '\"tag_name\": \"\\K.*?(?=\")'
+            cmd: ${<< parameters.variable >>} | grep -o '"tag_name": "\\K.*?(?=")'
         - match_version:
             <<: *envorb_args
         - complete:
