@@ -341,7 +341,8 @@ orbs:
             name: Create store
             command: |
               mkdir -pv ./env
-              echo "for file in \"\$(find ${PWD}/env -maxdepth 1 -iname '*.env' -exec basename {} .env ';' | egrep '.*')\"; do export ${file}=\"\$(cat $PWD/env/${file}.env)\"; done" > ./env/load.sh
+              echo "0.1.0" > ./env/ENVORB_VERSION.env
+              echo "for file in \"\$(find ${PWD}/env -maxdepth 1 -iname '*.env' -exec basename {} .env ';')\"; do export \${file}=\"\$(cat $PWD/env/\${file}.env)\"; done" > ./env/load.sh
               chmod +x ./env/load.sh
 
       value:
