@@ -1,3 +1,17 @@
+attach_params: &attach_params
+  attach:
+    description: "Attach workspace"
+    type: boolean
+    default: false
+  attach_at:
+    description: "Where to attach the workspace"
+    type: string
+    default: "."
+
+attach_args: &attach_args
+  attach: << parameters.attach >>
+  attach_at: << parameters.attach_at >>
+
 readmyhub_version_params: &readmyhub_version_params
   version:
     description: "Version of the readmyhub Docker image"
@@ -37,18 +51,11 @@ go_test_args: &go_test_args
   path: << parameters.path >>
 
 go_prepare_params: &go_prepare_params
+  <<: *attach_params
   dep:
     description: "To use 'dep' for dependency importing"
     type: boolean
     default: true
-  attach:
-    description: "Attach workspace"
-    type: boolean
-    default: false
-  attach_at:
-    description: "Where to attach the workspace"
-    type: string
-    default: "."
   import:
     description: "To use 'go get' for importing dependencies"
     type: boolean
@@ -63,9 +70,8 @@ go_prepare_params: &go_prepare_params
     default: []
 
 go_prepare_args: &go_prepare_args
+  <<: *attach_args
   dep: << parameters.dep >>
-  attach: << parameters.attach >>
-  attach_at: << parameters.attach_at >>
   import: << parameters.import >>
   import_path: << parameters.import_path >>
   prepare: << parameters.prepare >>
@@ -132,13 +138,13 @@ go_executor_envs: &go_executor_envs
   CGO_ENABLED: << parameters.cgo >>
   GOARCH: << parameters.goarch >>
 
-go_alpine_params: &go_alpine_params
+alpine_params: &alpine_params
   alpine_version:
     description: "Alpine version"
     type: string
     default: ""
 
-go_alpine_args: &go_alpine_args
+alpine_args: &alpine_args
   alpine_version: << parameters.alpine_version >>
 
 go_custom_build_params: &go_custom_build_params
@@ -202,16 +208,6 @@ docker_arg_params: &docker_arg_params
     type: string
     default: ""
 
-docker_attach_params: &docker_attach_params
-  attach:
-    description: "Attach workspace"
-    type: boolean
-    default: false
-  attach_at:
-    description: "Where to attach the workspace"
-    type: string
-    default: "."
-
 docker_build_params: &docker_build_params
   file:
     description: "Path to the Dockerfile"
@@ -245,6 +241,7 @@ docker_tags_params: &docker_tags_params
     default: ""
 
 docker_build_args: &docker_build_args
+  <<: *attach_args
   # Remove this once CircleCI-Public/config-preview-sdk#15 is merged
   use_args: << parameters.use_args >>
   args: << parameters.args >>
@@ -253,8 +250,6 @@ docker_build_args: &docker_build_args
   prepare: << parameters.prepare >>
   path: << parameters.path >>
   base_tag: << parameters.base_tag >>
-  attach: << parameters.attach >>
-  attach_at: << parameters.attach_at >>
   add_labels: << parameters.add_labels >>
 
 docker_version_params: &docker_version_params
@@ -263,7 +258,265 @@ docker_version_params: &docker_version_params
     type: string
     default: stable
 
+envorb_prepare_params: &envorb_prepare_params
+  <<: *attach_params
+  checkout:
+    description: "Environment variable depends on a checkout"
+    type: boolean
+    default: false
+  prepare:
+    description: "Environment variable depends on preparation steps"
+    type: steps
+    default: []
+
+envorb_prepare_args: &envorb_prepare_args
+  <<: *attach_args
+  checkout: << parameters.checkout >>
+  prepare: << parameters.prepare >>
+
+envorb_params: &envorb_params
+  variable:
+    description: "Name of the variable"
+    type: string
+    default: "VAR"
+
+envorb_args: &envorb_args
+  variable: << parameters.variable >>
+
+envorb_cmd_params: &envorb_cmd_params
+  cmd:
+    description: "Name of the command that generates the variable"
+    type: string
+
+envorb_cmd_args: &envorb_cmd_args
+  cmd: << parameters.cmd >>
+
+envorb_http_params: &envorb_http_params
+  address:
+    description: "Name of the http address that contains the variable"
+    type: string
+
+envorb_http_args: &envorb_http_args
+  address: << parameters.address >>
+
 orbs:
+  envorb:
+    executors:
+      default:
+        parameters:
+          <<: *alpine_params
+        docker:
+        - image: alpine:<< parameters.alpine_version >>
+    commands:
+      prepare:
+        parameters:
+          <<: *envorb_prepare_params
+          <<: *envorb_params
+        steps:
+        - run:
+            name: Check variable name
+            command: |
+              if [ -e "./env/<< parameters.variable >>.sh" ]; then
+                echo "Variable naming conflict"
+                exit 1
+              fi
+        - when:
+            condition: << parameters.checkout >>
+            steps:
+            - checkout
+        - when:
+            condition: << parameters.attach >>
+            steps:
+            - attach_workspace:
+                at: << parameters.attach_at >>
+        - steps: << parameters.prepare >>
+        - run:
+            name: Create store
+            command: |
+              mkdir -pv ./env
+              echo "for file in \"$(find ./env -maxdepth 1 -iname '*.env' -exec basename {} .env ';')\"; do export ${file}=\$(cat ./env/${file}.env); done" > ./env/load.sh
+              chmod +x ./env/load.sh
+
+      cmd:
+        parameters:
+          <<: *envorb_cmd_params
+          <<: *envorb_params
+        steps:
+        - run:
+            name: Execute command
+            command: |
+              source ./env/load.sh
+              export << parameters.variable >>=$(<< parameters.cmd >>)
+              echo "${<< parameters.variable >>}" > ./env/<< parameters.variable >>.env
+
+      http:
+        parameters:
+          <<: *envorb_http_params
+          <<: *envorb_params
+        steps:
+        - run:
+            name: Fetch HTTP
+            command: |
+              source ./env/load.sh
+              export << parameters.variable >>=$(wget -O - << parameters.address >>)
+              echo "${<< parameters.variable >>}" > ./env/<< parameters.variable >>.env
+
+      match_version:
+        parameters:
+          <<: *envorb_params
+        steps:
+        - run:
+          name: Match the semantic version
+          command: |
+            source ./env/load.sh
+            << parameters.variable >>=$(${<< parameters.variable >>} | sed -nre 's/^[^0-9]*(([0-9]+\.)*[0-9]+).*/\1/p')
+            echo "${<< parameters.variable >>}" > ./env/<< parameters.variable >>.env
+
+      complete:
+        parameters:
+          <<: *envorb_params
+        steps:
+        - persist_to_workspace:
+            root: .
+            paths:
+            - env/load.sh
+            - env/<< parameters.variable >>.env
+
+    jobs:
+      cmd:
+        description: "Derive the variable from the given command"
+        parameters:
+          <<: *envorb_params
+          <<: *envorb_prepare_params
+          <<: *alpine_params
+          <<: *envorb_cmd_params
+        executor:
+          name: default
+          <<: *alpine_args
+        steps:
+        - prepare:
+            <<: *envorb_args
+            <<: *envorb_prepare_args
+        - cmd:
+            <<: *envorb_args
+            <<: *envorb_cmd_args
+        - complete:
+            <<: *envorb_args
+
+      http:
+        description: "Derive the variable from the given http address"
+        parameters:
+          <<: *envorb_params
+          <<: *envorb_prepare_params
+          <<: *alpine_params
+          <<: *envorb_http_params
+        executor:
+          name: default
+          <<: *alpine_args
+        steps:
+        - prepare:
+            <<: *envorb_args
+            <<: *envorb_prepare_args
+        - http:
+            <<: *envorb_args
+            <<: *envorb_http_args
+        - complete:
+            <<: *envorb_args
+
+      cmd_version:
+        description: "Derive a semantic version from the given command"
+        parameters:
+          <<: *envorb_params
+          <<: *envorb_prepare_params
+          <<: *alpine_params
+          <<: *envorb_cmd_params
+        executor:
+          name: default
+          <<: *alpine_args
+        steps:
+        - prepare:
+            <<: *envorb_args
+            <<: *envorb_prepare_args
+        - cmd:
+            <<: *envorb_args
+            <<: *envorb_cmd_args
+        - match_version:
+            <<: *envorb_args
+        - complete:
+            <<: *envorb_args
+
+      http_version:
+        description: "Derive a semantic version from the given http address"
+        parameters:
+          <<: *envorb_params
+          <<: *envorb_prepare_params
+          <<: *alpine_params
+          <<: *envorb_http_params
+        executor:
+          name: default
+          <<: *alpine_args
+        steps:
+        - prepare:
+            <<: *envorb_args
+            <<: *envorb_prepare_args
+        - http:
+            <<: *envorb_args
+            <<: *envorb_http_args
+        - match_version:
+            <<: *envorb_args
+        - complete:
+            <<: *envorb_args
+
+      github:
+        description: "Derive the version from the github.com tag"
+        parameters:
+          <<: *envorb_params
+          <<: *envorb_prepare_params
+          <<: *alpine_params
+          repository:
+            description: "Repository in the format 'org/repo'"
+            type: string
+        executor:
+          name: default
+          <<: *alpine_args
+        steps:
+        - prepare:
+            <<: *envorb_args
+            <<: *envorb_prepare_args
+        - http:
+            <<: *envorb_args
+            address: https://api.github.com/repos/<< parameters.repository >>/releases/latest
+        - cmd:
+            cmd: ${<< parameters.variable >>} | grep -o '\"tag_name\": \"\\K.*?(?=\")'
+        - match_version:
+            <<: *envorb_args
+        - complete:
+            <<: *envorb_args
+
+      git_tag:
+        description: "Derive the version from the latest git tag"
+        parameters:
+          <<: *envorb_params
+          <<: *envorb_prepare_params
+          <<: *alpine_params
+          repository:
+            description: "Path to the local git repository"
+            type: string
+            default: "."
+        executor:
+          name: default
+          <<: *alpine_args
+        steps:
+        - prepare:
+            <<: *envorb_args
+            <<: *envorb_prepare_args
+        - cmd:
+            cmd: cd ${<< parameters.repository >>} && git describe --abbrev=0 --tags
+        - match_version:
+            <<: *envorb_args
+        - complete:
+            <<: *envorb_args
+
   readmyhuborb:
     executors:
       default:
@@ -338,6 +591,7 @@ orbs:
         steps:
         - update:
             derive_repo: << parameters.derive_repo >>
+
   goorb:
     executors:
       default:
@@ -353,7 +607,7 @@ orbs:
         parameters:
           <<: *go_executor_params
           <<: *go_version_params
-          <<: *go_alpine_params
+          <<: *alpine_params
         docker:
         - image: gofunky/golang:<< parameters.go_version >>-alpine<< parameters.alpine_version >>
         working_directory: ~/app
@@ -398,32 +652,32 @@ orbs:
         - when:
             condition: << parameters.dep >>
             steps:
-              - restore_cache:
-                  key: dep-<< parameters.go_version >>
-              - run:
-                  name: Update dependencies
-                  command: |
-                    source /go/to.sh
-                    if [ -e "Gopkg.toml" ]; then
-                      echo "Fetching vendor folder"
-                      dep ensure -v -vendor-only
-                    else
-                      echo "Initializing dependencies"
-                      dep init -v
-                    fi
-                    source /go/to.sh
-              - save_cache:
-                  key: dep-<< parameters.go_version >>-{{ checksum "Gopkg.toml" }}-{{ checksum "Gopkg.lock" }}
-                  paths:
-                  - vendor
+            - restore_cache:
+                key: dep-<< parameters.go_version >>
+            - run:
+                name: Update dependencies
+                command: |
+                  source /go/to.sh
+                  if [ -e "Gopkg.toml" ]; then
+                    echo "Fetching vendor folder"
+                    dep ensure -v -vendor-only
+                  else
+                    echo "Initializing dependencies"
+                    dep init -v
+                  fi
+                  source /go/to.sh
+            - save_cache:
+                key: dep-<< parameters.go_version >>-{{ checksum "Gopkg.toml" }}-{{ checksum "Gopkg.lock" }}
+                paths:
+                - vendor
         - when:
             condition: << parameters.import >>
             steps:
-              - run:
-                  name: Get Dependencies
-                  command: |
-                    source /go/to.sh
-                    go get -u << parameters.import_path >>
+            - run:
+                name: Get Dependencies
+                command: |
+                  source /go/to.sh
+                  go get -u << parameters.import_path >>
 
       test:
         parameters:
@@ -553,18 +807,18 @@ orbs:
         - when:
             condition: << parameters.upx >>
             steps:
-              - run:
-                  name: Compressing binary using UPX
-                  command: |
-                    source /go/to.sh
-                    if [ -n "<< parameters.output >>" ]; then
-                      echo "Compressing << parameters.output >>..."
-                      ls -l << parameters.output >>
-                      upx --brute << parameters.output >>
-                      ls -l << parameters.output >>
-                    else
-                      echo "Skipping compression because output is not defined"
-                    fi
+            - run:
+                name: Compressing binary using UPX
+                command: |
+                  source /go/to.sh
+                  if [ -n "<< parameters.output >>" ]; then
+                    echo "Compressing << parameters.output >>..."
+                    ls -l << parameters.output >>
+                    upx --brute << parameters.output >>
+                    ls -l << parameters.output >>
+                  else
+                    echo "Skipping compression because output is not defined"
+                  fi
         - run:
             name: Final sync
             command: source /go/to.sh
@@ -628,12 +882,12 @@ orbs:
           <<: *go_build_params
           <<: *go_executor_params
           <<: *go_version_params
-          <<: *go_alpine_params
+          <<: *alpine_params
         executor:
           name: alpine
           <<: *go_executor_args
           <<: *go_version_args
-          <<: *go_alpine_args
+          <<: *alpine_args
         steps:
         - prepare:
             <<: *go_prepare_args
@@ -669,12 +923,12 @@ orbs:
           <<: *go_executor_params
           <<: *go_version_params
           <<: *go_custom_build_params
-          <<: *go_alpine_params
+          <<: *alpine_params
         executor:
           name: alpine
           <<: *go_executor_args
           <<: *go_version_args
-          <<: *go_alpine_args
+          <<: *alpine_args
         steps:
         - prepare:
             <<: *go_prepare_args
@@ -714,12 +968,12 @@ orbs:
           <<: *go_executor_params
           <<: *go_version_params
           <<: *go_custom_build_params
-          <<: *go_alpine_params
+          <<: *alpine_params
         executor:
           name: alpine
           <<: *go_executor_args
           <<: *go_version_args
-          <<: *go_alpine_args
+          <<: *alpine_args
         steps:
         - prepare:
             <<: *go_prepare_args
@@ -755,12 +1009,12 @@ orbs:
           <<: *go_test_params
           <<: *go_executor_params
           <<: *go_version_params
-          <<: *go_alpine_params
+          <<: *alpine_params
         executor:
           name: alpine
           <<: *go_executor_args
           <<: *go_version_args
-          <<: *go_alpine_args
+          <<: *alpine_args
         steps:
         - prepare:
             <<: *go_prepare_args
@@ -898,7 +1152,7 @@ orbs:
       build:
         parameters:
           <<: *docker_arg_params
-          <<: *docker_attach_params
+          <<: *attach_params
           <<: *docker_build_params
         steps:
         - checkout
@@ -1039,7 +1293,7 @@ orbs:
           docker_version: << parameters.docker_version >>
         parameters:
           <<: *docker_arg_params
-          <<: *docker_attach_params
+          <<: *attach_params
           <<: *docker_build_params
           <<: *docker_version_params
         steps:
@@ -1053,7 +1307,7 @@ orbs:
           docker_version: << parameters.docker_version >>
         parameters:
           <<: *docker_arg_params
-          <<: *docker_attach_params
+          <<: *attach_params
           <<: *docker_build_params
           <<: *docker_tags_params
           <<: *docker_version_params
@@ -1077,7 +1331,7 @@ orbs:
           docker_version: << parameters.docker_version >>
         parameters:
           <<: *docker_arg_params
-          <<: *docker_attach_params
+          <<: *attach_params
           <<: *docker_build_params
           <<: *docker_tags_params
           <<: *docker_version_params
@@ -1105,7 +1359,7 @@ orbs:
           docker_version: << parameters.docker_version >>
         parameters:
           <<: *docker_arg_params
-          <<: *docker_attach_params
+          <<: *attach_params
           <<: *docker_build_params
           <<: *docker_tags_params
           <<: *docker_version_params
